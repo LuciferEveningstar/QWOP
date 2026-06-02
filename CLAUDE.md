@@ -14,7 +14,7 @@ Studienprojekt "Neue Konzepte 2" (DHBW).
 
 ## Tech-Stack
 
-- Python 3.11+
+- Python **3.11** (3.12 funktioniert nicht zuverlässig mit `qwop-gym 1.0.1`, siehe "Bekannte Stolpersteine")
 - Stable-Baselines3 (RL)
 - Gymnasium (Env-Interface)
 - PyTorch (Backend)
@@ -23,6 +23,26 @@ Studienprojekt "Neue Konzepte 2" (DHBW).
 ## Architektur — wichtig
 
 Die Anbindung an QWOP (Browser via Selenium/Playwright vs. Python-Reimplementation vs. nur Gym-Wrapper) ist **noch nicht entschieden**. Siehe [`docs/architecture.md`](docs/architecture.md). Bevor Code im `envs/`-Ordner geschrieben wird, muss diese Entscheidung in einem ADR (`docs/adr/`) festgehalten werden.
+
+### Recherche-Stand (Stand: 2026-06-02)
+
+Wir haben **mehrere existierende QWOP-RL-Projekte** evaluiert. Das vielversprechendste ist:
+
+**[`smanolloff/qwop-gym`](https://github.com/smanolloff/qwop-gym)** (Apache-2.0, zuletzt aktualisiert Februar 2025)
+- Genau unser Stack: Gymnasium + Stable-Baselines3 + PyTorch
+- Browser-Anbindung (Chrome via ChromeDriver) — aber **stark optimiert**: WebSocket-Brücke, gepatchtes QWOP für Determinismus, kein WebGL beim Training, **>1900 Steps/s gemessen**
+- Joint-State-Observation: kompakte 60-Byte-Vektoren
+- 15 diskrete Aktionen (alle QWOP-Tastenkombinationen)
+- Pretrained Models in einem W&B Public Project verfügbar
+- Mehrere Algorithmen vorimplementiert: PPO, DQN, QRDQN, plus BC/GAIL/AIRL für Imitation Learning
+- `pip install qwop-gym` als PyPI-Package
+
+Andere geprüfte Projekte (alle weniger geeignet):
+- `drakesvoboda/RL-QWOP` — alter Stack (gym+SB v2 von 2021), keine Lizenz, undokumentiert
+- `Kirkados/QWOP` — Box2D-Reimplementation, aber TF 1.15 (uralt), keine Lizenz
+- 6 weitere (siehe Recherche-Notes) — alle entweder JS-only, tot, oder schlechter dokumentiert
+
+**Empfehlungs-Tendenz:** qwop-gym als Basis nehmen, eigener wissenschaftlicher Beitrag in Reward-Engineering / Algorithmen-Vergleich / Hyperparameter-Studie / Imitation-Learning. Endgültige Entscheidung folgt in **ADR-0001** nach Smoke-Test-Abschluss.
 
 ## Projektstruktur
 
@@ -94,4 +114,64 @@ tensorboard --logdir logs/
 
 ## Bekannte Stolpersteine
 
-- _(Hier ergänzen, sobald welche auftauchen — z.B. "Selenium-Driver muss zur Chrome-Version passen".)_
+### Aus dem qwop-gym-Smoke-Test (2026-06-02)
+
+Falls ihr `smanolloff/qwop-gym` lokal aufsetzt — folgendes vorab beachten:
+
+1. **ChromeDriver muss exakt zur Chrome-Major-Version passen.**
+   - Homebrew (`brew install --cask chromedriver`) liefert immer die neueste Version → Mismatch zu Chrome wahrscheinlich.
+   - Lösung: passende Version manuell von [Chrome-for-Testing](https://googlechromelabs.github.io/chrome-for-testing/) holen.
+   - Beispiel-Snippet (mac-arm64, Chrome 148):
+     ```bash
+     curl -sSL -o /tmp/cd.zip "https://storage.googleapis.com/chrome-for-testing-public/148.0.7778.178/mac-arm64/chromedriver-mac-arm64.zip"
+     unzip -d /tmp/cd /tmp/cd.zip
+     mkdir -p ~/qwop-gym-test/bin
+     cp /tmp/cd/chromedriver-mac-arm64/chromedriver ~/qwop-gym-test/bin/chromedriver
+     chmod +x ~/qwop-gym-test/bin/chromedriver
+     xattr -d com.apple.quarantine ~/qwop-gym-test/bin/chromedriver
+     ```
+   - Driver-Pfad in `config/env.yml` setzen.
+   - Hinweis: Brew-Cask `chromedriver` ist seit kurzem deprecated (passt macOS-Gatekeeper nicht).
+
+2. **`bootstrap` ist interaktiv.** Es fragt nach Browser- und Driver-Pfad. Per Pipe füttern:
+   ```bash
+   printf "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\n/path/to/chromedriver\n" | qwop-gym bootstrap
+   ```
+
+3. **Spiel-Quelle herunterladen:** `curl -sL https://www.foddy.net/QWOP.min.js | qwop-gym patch` (Patch macht das Spiel deterministisch).
+
+4. **`pip install qwop-gym` installiert SB3/tqdm/rich NICHT mit.** Für Training zusätzlich nachziehen:
+   ```bash
+   pip install stable-baselines3 sb3-contrib tensorboard tqdm rich
+   ```
+
+5. **Direktes Env-Skripten braucht `if __name__ == "__main__":`** — sonst Endlos-Spawn-Schleife auf macOS (Default-`spawn`-Methode reimportiert das Skript). Beispiel:
+   ```python
+   import gymnasium as gym, qwop_gym, yaml
+   def main():
+       with open("config/env.yml") as f: kw = yaml.safe_load(f)
+       env = gym.make("QWOP-v1", **kw)
+       env.reset(seed=42)
+       # ...
+       env.close()
+   if __name__ == "__main__":
+       main()
+   ```
+
+6. **Python-Version: 3.11 nutzen, NICHT 3.12.** Mit Python 3.12 hängt `qwop-gym train_ppo` (mit aktueller SB3 ≥ 2.7) bei Step 1 — vermutlich Inkompatibilität SB3 2.8 × qwop-gym 1.0.1 (Okt 2023) × Python 3.12. Mit **Python 3.11 läuft es out-of-the-box** (10k PPO-Steps in ~23s gemessen). Brew: `brew install python@3.11`.
+
+7. **macOS-Quarantäne entfernen** vor dem ersten Driver-Aufruf, sonst hängt `chromedriver --version` ohne Output:
+   ```bash
+   xattr -d com.apple.quarantine /pfad/zu/chromedriver
+   ```
+
+8. **Cleanup nach Test:** Wenn der Trainings-Prozess hängt, bleiben Chrome-Test-Instanzen offen (kleines Fenster auf Position 650,130, leicht zu übersehen). Aufräumen:
+   ```bash
+   pkill -f "user-agent=Chrome-"
+   pkill -f chromedriver
+   ```
+
+### Allgemein
+
+- Selenium-Driver muss zur Chrome-Version passen (siehe oben).
+- Browser darf laut qwop-gym-README nicht in den Hintergrund wechseln (OS drosselt) — heißt für längere Trainings: dedizierte Maschine, Bildschirm nicht sperren.

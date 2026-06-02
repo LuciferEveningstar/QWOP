@@ -7,7 +7,7 @@ name = "qwop-rl"
 version = "0.1.0"
 description = "Reinforcement Learning agent that plays QWOP."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.12"
 license = { text = "MIT" }
 authors = [
     { name = "QWOP-RL Team" },

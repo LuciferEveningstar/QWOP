@@ -48,7 +48,56 @@ YAML pro Lauf: Algorithmus, Hyperparameter, Env-Parameter, Logging-Pfade, Seed.
 | **(A3) Bestehender Open-Source-Port als Env**     | Spart Reimpl; oft schon Gym-kompatibel                                               | Lizenz/Status prüfen; Code-Qualität variabel                            |
 | **(A4) Hybrid: Browser für Eval, Reimpl fürs Training** | Beste aus beiden Welten                                                          | Doppelte Wartung; Sim-to-Real-Gap zwischen den beiden Envs              |
 
-**Empfehlung für die Diskussion:** (A2) oder (A3) fürs eigentliche RL-Training (sonst dauert Training Wochen statt Stunden), und (A1) optional fürs Abschluss-Demo. Endgültige Wahl in **ADR-0001** festhalten.
+### Recherche zu A3 — Stand 2026-06-02
+
+Insgesamt 9 existierende Projekte gefunden, davon einer eindeutiger Spitzenkandidat:
+
+| Repo | Stack | Letzter Commit | Lizenz | Bewertung |
+| --- | --- | --- | --- | --- |
+| [`smanolloff/qwop-gym`](https://github.com/smanolloff/qwop-gym) | gymnasium + SB3 + PyTorch | 02/2025 | **Apache-2.0** | ⭐ **Top-Kandidat** |
+| [`Kirkados/QWOP`](https://github.com/Kirkados/QWOP) | TF 1.15 + Box2D | 04/2021 | keine | Stack veraltet |
+| [`drakesvoboda/RL-QWOP`](https://github.com/drakesvoboda/RL-QWOP) | gym + SB v2 | 02/2021 | keine | unterdurchschnittlich |
+| 6 weitere | — | — | — | nicht relevant |
+
+#### `smanolloff/qwop-gym` — Detail
+
+- **Architektur:** Browser-Anbindung (Chrome/ChromeDriver), aber stark optimiert via WebSocket-Brücke und gepatchtem QWOP-Code
+- **Performance:** **1900+ Steps/s** auf macOS M-Series (gemessen, README verspricht 2000+)
+- **Observation:** Joint-State, kompakte 60-Byte-Vektoren (kein Pixel-Lernen nötig)
+- **Action Space:** 15 diskrete Tastenkombinationen (Discrete(16) inkl. "kein Tasten")
+- **Algorithmen vorimplementiert:** PPO, DQN, QRDQN, BC, GAIL, AIRL
+- **Pretrained Models:** ja, in einem W&B Public Project
+- **Determinismus:** ja (gepatchtes QWOP-Spiel)
+- **CLI:** fertig, `pip install qwop-gym` als PyPI-Package
+- **Dokumentation:** README + `doc/env.md` + `doc/game.md`
+
+#### Smoke-Test-Ergebnis (2026-06-02)
+
+Auf einer Mac-arm64-Testmaschine durchgeführt:
+
+| Schritt | Ergebnis |
+| --- | --- |
+| `pip install qwop-gym` | ✅ funktioniert |
+| `qwop-gym bootstrap` (interaktiv) | ✅ funktioniert (mit Pipe-Input) |
+| `qwop-gym patch` (Spiel patchen) | ✅ funktioniert |
+| `qwop-gym benchmark` (10k random steps) | ✅ **1920 Steps/s** |
+| Direktes Env-Skript (200 Steps) | ✅ **1291 Steps/s** (mit `if __name__ == "__main__":`) |
+| `qwop-gym train_ppo` (Mini-Training, Python 3.11) | ✅ **10.000 PPO-Steps in 22,9 s**, Modell gespeichert |
+| `qwop-gym train_ppo` (Mini-Training, Python 3.12) | ❌ hängt bei Step 1 — Inkompatibilität SB3 2.8 × qwop-gym 1.0.1 × Python 3.12 |
+
+**Konsequenz:** Mit Python 3.11 ist die komplette Pipeline lauffähig. Das Tech-Stack-`Python 3.11+` aus `CLAUDE.md` muss daher genauer auf **Python 3.11** festgelegt werden, nicht 3.12+.
+
+### Empfehlungs-Tendenz
+
+`qwop-gym` als Basis. Der wissenschaftliche Beitrag des Studienprojekts würde dann darauf aufsetzen — z.B.:
+- Algorithmen-Vergleich (PPO vs. DQN vs. QRDQN, ggf. eigener Algorithmus)
+- Reward-Engineering-Studie
+- Imitation Learning vs. RL from scratch
+- Hyperparameter-Studie mit W&B-Sweeps
+- Curriculum Learning
+- Observation-Ablation (welche der 60 Bytes sind nötig?)
+
+Endgültige Entscheidung folgt in **ADR-0001** nach abgeschlossenem Smoke-Test.
 
 ### B. Observation-Design
 
