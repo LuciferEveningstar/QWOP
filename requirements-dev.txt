@@ -1,0 +1,14 @@
+-r requirements.txt
+
+# Testing
+pytest>=8.0.0
+pytest-cov>=4.1.0
+
+# Linting / Formatting
+ruff>=0.3.0
+mypy>=1.9.0
+pre-commit>=3.6.0
+
+# Notebooks
+jupyter>=1.0.0
+ipykernel>=6.29.0
