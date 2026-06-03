@@ -85,6 +85,17 @@ docs/          # Architektur + ADRs + Onboarding
 - **PRs:** Mindestens ein Review vor Merge. Squash-Merge auf `main`.
 - Niemals direkt auf `main` pushen.
 
+### Experiment-Tracking (Weights & Biases)
+
+Modelle und Trainings-Metriken **gehören nicht ins Git-Repo**, sondern in W&B. Setup-Anleitung: [`docs/wandb-setup.md`](docs/wandb-setup.md).
+
+- **Jeder Trainingslauf loggt zu W&B** (Projekt: `qwop-rl-dhbw`). Lokale-Only-Läufe nur fürs Debuggen mit `--no-wandb` oder `WANDB_MODE=disabled`.
+- **Run-Naming:** `<initialen>-<datum>-<beschreibung>`, z.B. `pl-2026-06-04-failure50`.
+- **Tags vergeben:** `baseline`, `experiment`, `final`, `broken`, `wip` — direkt in der W&B-UI.
+- **API-Keys:** in `.env` (gitignored). Vorlage in `.env.example`. Niemals committen.
+- **Beste Modelle:** in W&B mit Tag `best` markieren + Artifact-Alias setzen, damit Team-Mitglieder sie laden können.
+- **Configs für interessante Läufe** committen (`configs/ppo_<variante>.yaml`). Wegwerf-Experimente bleiben lokal.
+
 ## Workflows für Claude
 
 - **Vor größeren Änderungen** zuerst Plan vorschlagen / EnterPlanMode nutzen.
@@ -100,6 +111,7 @@ docs/          # Architektur + ADRs + Onboarding
 python3.11 -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt && pip install -e .
 pre-commit install
+cp .env.example .env   # WANDB_API_KEY eintragen
 
 # Entwicklung
 ruff check . && ruff format .
@@ -109,7 +121,12 @@ pytest --cov=qwop_rl
 
 # Training (sobald Env existiert)
 python scripts/train.py --config configs/ppo_default.yaml
+python scripts/train.py --config configs/ppo_default.yaml --run-name pl-baseline --tags experiment
+python scripts/train.py --config configs/ppo_default.yaml --no-wandb   # Quick-Debug ohne Tracking
+
+# Lokale Lernkurven
 tensorboard --logdir logs/
+# (oder live im Browser auf wandb.ai)
 ```
 
 ## Bekannte Stolpersteine
