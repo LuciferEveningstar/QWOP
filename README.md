@@ -87,8 +87,10 @@ gh pr create
 
 ## Modelle und Trainings-Ergebnisse
 
-Modelle, Lernkurven und Metriken werden **nicht** im Git-Repo gespeichert, sondern in **Weights & Biases**.
-Setup-Anleitung: [`docs/wandb-setup.md`](docs/wandb-setup.md).
+Modelle, Lernkurven und Metriken werden **nicht** im Git-Repo gespeichert, sondern in **Weights & Biases**:
+
+- **Workspace:** [wandb.ai/qwop-rl/qwop-rl-dhbw](https://wandb.ai/qwop-rl/qwop-rl-dhbw)
+- Setup-Anleitung: [`docs/wandb-setup.md`](docs/wandb-setup.md)
 
 ## Team
 

@@ -2,6 +2,10 @@
 
 Wir nutzen [Weights & Biases (W&B)](https://wandb.ai), um Trainingsläufe, Modelle und Lernkurven zentral zu sammeln und im Team zu teilen.
 
+**Unser Workspace:** [wandb.ai/qwop-rl/qwop-rl-dhbw](https://wandb.ai/qwop-rl/qwop-rl-dhbw)
+- **Entity** (Team): `qwop-rl`
+- **Project**: `qwop-rl-dhbw`
+
 ## Warum nicht Git?
 
 Git ist gut für Code und Configs. Nicht für:
@@ -30,8 +34,7 @@ W&B löst genau das: Modelle landen in einer Cloud-Registry, Metriken werden liv
 
 ### 2. Team-Workspace beitreten
 
-Patryk legt das Team-Projekt `qwop-rl-dhbw` an und lädt euch über die W&B-UI ein.
-(Alternativ kann jede:r das Projekt als persönliches Projekt nutzen — aber dann sehen sich die Läufe nicht gegenseitig.)
+Das Team-Projekt `qwop-rl-dhbw` unter Entity `qwop-rl` ist bereits angelegt ([wandb.ai/qwop-rl/qwop-rl-dhbw](https://wandb.ai/qwop-rl/qwop-rl-dhbw)). Patryk lädt dich über die W&B-UI ein — dann sind deine Runs für alle sichtbar.
 
 ### 3. API-Key holen
 
@@ -39,7 +42,7 @@ Auf [wandb.ai/authorize](https://wandb.ai/authorize) findest du deinen persönli
 
 ### 4. Lokal verknüpfen
 
-Im Repo-Root:
+Im Repo-Root (also `QWOP/`, nicht eine Ebene drüber!):
 
 ```bash
 cp .env.example .env
@@ -48,7 +51,13 @@ cp .env.example .env
 
 `.env` ist gitignored — jede:r hat seine/ihre eigene.
 
-Alternativ einmalig global:
+> **Stolpersteine beim Eintragen:**
+> - **Repo-Root.** Die `.env` muss in `QWOP/.env` liegen, **nicht** in `Documents/DHBW/Neue Konzepte 2/.env`. `train.py` und `python-dotenv` suchen sie nur dort.
+> - **Variablen-Name.** `WANDB_API_KEY=` (mit `_API_`), nicht `WANDB_KEY=`.
+> - **Newline am Zeilenende.** Achte darauf, dass nach jeder Variable ein echter Zeilenumbruch kommt — sonst landen mehrere Variablen in einer Zeile, der Key wird ungültig und W&B meldet "API key invalid".
+> - **Keine Anführungszeichen** um den Wert.
+
+Alternativ einmalig global (umgeht die `.env`-Logik komplett):
 
 ```bash
 wandb login
@@ -59,8 +68,16 @@ wandb login
 
 ```bash
 source .venv/bin/activate
-python -c "import wandb; wandb.login(); print('OK')"
+
+# Variante A: nur prüfen, ob die .env korrekt parst
+awk -F= '/^[A-Z]/ {print $1, "(" length($2), "Zeichen)"}' .env
+# Erwartet: WANDB_API_KEY (~80 Zeichen), WANDB_ENTITY (7), WANDB_PROJECT (12)
+
+# Variante B: Connection-Test gegen W&B
+python -c "from dotenv import load_dotenv; load_dotenv(); import wandb; wandb.login(verify=True); print('W&B OK')"
 ```
+
+Wenn das `W&B OK` ausgibt: Setup steht. Sonst zeigt W&B im Fehler genau, was klemmt (z.B. "API key invalid").
 
 ## Alltag: ein Trainingslauf
 
@@ -81,7 +98,7 @@ Das Skript:
 3. Speichert das fertige Modell als W&B-Artifact
 4. Verknüpft alles mit dem aktuellen Git-Commit-Hash
 
-Im Browser unter [wandb.ai/qwop-rl-dhbw](https://wandb.ai/) (URL anpassen, sobald Workspace existiert) seht ihr die Lernkurve **live**.
+Im Browser unter [wandb.ai/qwop-rl/qwop-rl-dhbw](https://wandb.ai/qwop-rl/qwop-rl-dhbw) seht ihr die Lernkurve **live**.
 
 ## Konventionen
 
@@ -126,6 +143,12 @@ Wenn ein Lauf einen neuen **Best-of-Group** liefert:
 Andere können dann mit `wandb.use_artifact("qwop-rl-dhbw/qwop-ppo-model:best")` direkt das beste Modell laden.
 
 ## FAQ
+
+**F: W&B sagt "API key invalid: must have 40+ characters, has 7" — was ist los?**
+A: Das passiert, wenn deine `.env` zwei Variablen ohne Newline dazwischen hat (z.B. `WANDB_API_KEY=...WANDB_PROJECT=...` als eine Zeile). Prüfe mit `awk -F= '/^[A-Z]/ {print $1, "(" length($2), "Zeichen)"}' .env`. Jeder Wert sollte plausibel lang sein.
+
+**F: `train.py` findet meine `.env` nicht.**
+A: Liegt sie wirklich in `QWOP/.env` und nicht in `Documents/DHBW/Neue Konzepte 2/.env`? Letzteres ist eine Ebene drüber und wird nicht gefunden.
 
 **F: Was, wenn ich offline trainieren will?**
 A: `WANDB_MODE=offline python scripts/train.py …` — loggt lokal, beim nächsten `wandb sync` wird hochgeladen.
