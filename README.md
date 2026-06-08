@@ -21,6 +21,8 @@ Ein RL-Agent (Stable-Baselines3) soll lernen, einen QWOP-Läufer möglichst weit
 
 ## Quickstart
 
+> Vollständige Anleitung mit Troubleshooting: **[`SETUP.md`](SETUP.md)** — *empfohlen für den ersten Setup*
+
 ```bash
 # 1. Repo klonen
 git clone https://github.com/LuciferEveningstar/QWOP.git
@@ -28,11 +30,12 @@ cd QWOP
 
 # 2. Virtuelles Environment (Python 3.11!)
 python3.11 -m venv .venv
-source .venv/bin/activate           # Windows: .venv\Scripts\activate
+source .venv/bin/activate           # Windows: .venv\Scripts\Activate.ps1
 
 # 3. Dependencies
 pip install -r requirements-dev.txt
 pip install -e .
+pip install qwop-gym
 
 # 4. Pre-Commit Hooks
 pre-commit install
@@ -43,6 +46,8 @@ cp .env.example .env                # dann WANDB_API_KEY eintragen
 # 6. Tests
 pytest
 ```
+
+Der Quickstart überspringt **ChromeDriver-Setup**, **QWOP-Patch** und **W&B-Verifikation** — diese Schritte stehen detailliert in [`SETUP.md`](SETUP.md).
 
 ## Projektstruktur
 
@@ -66,6 +71,7 @@ QWOP/
 
 | Datei                                                     | Inhalt                                                          |
 | --------------------------------------------------------- | --------------------------------------------------------------- |
+| [`SETUP.md`](SETUP.md)                                    | **Komplette Setup-Anleitung** (Win + macOS, mit Troubleshooting)|
 | [`CLAUDE.md`](CLAUDE.md)                                  | Projekt-Konventionen + bekannte Stolpersteine                   |
 | [`docs/concepts.md`](docs/concepts.md)                    | **RL-Grundbegriffe** (Step, Observation, Action, Reward, …)     |
 | [`docs/architecture.md`](docs/architecture.md)            | Anbindungs-Optionen, Recherche-Stand, Smoke-Test-Ergebnisse     |

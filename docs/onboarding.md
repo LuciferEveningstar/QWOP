@@ -12,20 +12,26 @@ Hi 👋 willkommen im Team! Diese Checkliste bringt dich von Null zu "lokal lauf
 
 ## 2. Repo holen & Setup
 
+**Vollständige Anleitung:** [`SETUP.md`](../SETUP.md) (mit allen Stolpersteinen für Windows + macOS).
+
+Kurzform für erfahrene Entwickler:
+
 ```bash
 git clone https://github.com/LuciferEveningstar/QWOP.git
 cd QWOP
 python3.11 -m venv .venv
-source .venv/bin/activate                # Windows: .venv\Scripts\activate
+source .venv/bin/activate                # Windows: .venv\Scripts\Activate.ps1
 pip install --upgrade pip
 pip install -r requirements-dev.txt
 pip install -e .
+pip install qwop-gym
 pre-commit install
 
 # W&B-Verknüpfung
 cp .env.example .env                     # WANDB_API_KEY eintragen
-# oder einmalig global: wandb login
 ```
+
+Plus ChromeDriver passend zur Chrome-Version (siehe SETUP.md Schritt 5) und `qwop-gym patch` für deterministisches Spiel.
 
 ## 3. Sanity-Check
 

@@ -11,6 +11,6 @@ def test_package_has_version() -> None:
 
 def test_subpackages_importable() -> None:
     """All declared subpackages must import without side effects."""
-    import qwop_rl.agents  # noqa: F401
-    import qwop_rl.envs  # noqa: F401
+    import qwop_rl.agents
+    import qwop_rl.envs
     import qwop_rl.utils  # noqa: F401
