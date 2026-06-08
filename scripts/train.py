@@ -89,7 +89,10 @@ def main() -> int:
         try:
             import wandb
         except ImportError:
-            print("[train] wandb not installed. Run `pip install wandb` or use --no-wandb.", file=sys.stderr)
+            print(
+                "[train] wandb not installed. Run `pip install wandb` or use --no-wandb.",
+                file=sys.stderr,
+            )
             return 1
         wandb.init(
             project=os.environ.get("WANDB_PROJECT", "qwop-rl-dhbw"),
