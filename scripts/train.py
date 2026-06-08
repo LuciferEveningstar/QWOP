@@ -1,15 +1,14 @@
 """Training entry point.
 
-Loads a YAML config, starts a Stable-Baselines3 training run, and logs everything
-to Weights & Biases. The actual environment binding (qwop-gym vs. own wrapper)
-will be wired in once ADR-0001 has been accepted; until then the script imports
-`make_env` from `qwop_rl.envs` lazily and fails with a clear message if it's
-missing.
+Loads a YAML config, builds a vectorised QWOP environment, runs Stable-Baselines3
+PPO, and logs everything to Weights & Biases (unless disabled via --no-wandb or
+WANDB_MODE=disabled).
 
 Usage:
     python scripts/train.py --config configs/ppo_default.yaml
     python scripts/train.py --config configs/ppo_default.yaml --run-name pl-baseline
     python scripts/train.py --config configs/ppo_default.yaml --tags experiment baseline
+    python scripts/train.py --config configs/ppo_default.yaml --no-wandb
 
 Environment variables (loaded from .env if present):
     WANDB_API_KEY        Required for online logging
@@ -85,6 +84,7 @@ def main() -> int:
 
     # ── W&B init ──────────────────────────────────────────────────────────
     use_wandb = not args.no_wandb and os.environ.get("WANDB_MODE") != "disabled"
+    wandb_run = None
     if use_wandb:
         try:
             import wandb
@@ -94,7 +94,7 @@ def main() -> int:
                 file=sys.stderr,
             )
             return 1
-        wandb.init(
+        wandb_run = wandb.init(
             project=os.environ.get("WANDB_PROJECT", "qwop-rl-dhbw"),
             entity=os.environ.get("WANDB_ENTITY") or None,
             name=run_name,
@@ -107,33 +107,62 @@ def main() -> int:
     else:
         print("[train] W&B logging disabled.")
 
-    # ── Env + Agent (placeholder until ADR-0001) ──────────────────────────
-    try:
-        from qwop_rl.envs import make_env  # noqa: F401  not yet implemented
-    except ImportError:
-        print(
-            "[train] qwop_rl.envs.make_env is not implemented yet — "
-            "waiting for ADR-0001 (QWOP binding decision).",
-            file=sys.stderr,
+    # ── Env + Agent ───────────────────────────────────────────────────────
+    from stable_baselines3 import PPO
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    from qwop_rl.envs import make_env
+
+    training_cfg = config.get("training", {})
+    n_envs = int(training_cfg.get("n_envs", 1))
+    seed = training_cfg.get("seed")
+
+    def _env_factory() -> Any:
+        return make_env(config.get("env"))
+
+    vec_env = DummyVecEnv([_env_factory for _ in range(n_envs)])
+    if seed is not None:
+        vec_env.seed(int(seed))
+
+    paths_cfg = config.get("paths", {})
+    log_dir = Path(paths_cfg.get("log_dir", f"logs/{run_name}"))
+    model_dir = Path(paths_cfg.get("model_dir", f"models/{run_name}"))
+    log_dir.mkdir(parents=True, exist_ok=True)
+    model_dir.mkdir(parents=True, exist_ok=True)
+
+    ppo_cfg = dict(config.get("ppo", {}))
+    policy = ppo_cfg.pop("policy", "MlpPolicy")
+    model = PPO(
+        policy,
+        vec_env,
+        verbose=1,
+        tensorboard_log=str(log_dir),
+        seed=int(seed) if seed is not None else None,
+        **ppo_cfg,
+    )
+
+    callback = None
+    if use_wandb and wandb_run is not None:
+        from wandb.integration.sb3 import WandbCallback
+
+        callback = WandbCallback(
+            model_save_path=str(model_dir),
+            verbose=2,
         )
-        if use_wandb:
-            wandb.finish(exit_code=0, quiet=True)
-        return 0
 
-    # TODO: actual training loop, e.g.:
-    #
-    #     env = make_env(config["env"])
-    #     model = PPO(config["ppo"]["policy"], env, **config["ppo"], tensorboard_log="logs/")
-    #     model.learn(
-    #         total_timesteps=config["training"]["total_timesteps"],
-    #         callback=WandbCallback(model_save_path=f"models/{run_name}"),
-    #     )
-    #     if use_wandb:
-    #         wandb.save(f"models/{run_name}/*.zip")
+    total_timesteps = int(training_cfg.get("total_timesteps", 100_000))
+    print(f"[train] Starting PPO for {total_timesteps:,} timesteps (n_envs={n_envs}).")
+    model.learn(total_timesteps=total_timesteps, callback=callback)
 
-    print("[train] Training loop not yet implemented.")
-    if use_wandb:
-        wandb.finish(quiet=True)
+    final_path = model_dir / "final.zip"
+    model.save(final_path)
+    print(f"[train] Model saved to {final_path}")
+
+    if use_wandb and wandb_run is not None:
+        wandb_run.save(str(final_path))
+        wandb_run.finish(quiet=True)
+
+    vec_env.close()
     return 0
 
 

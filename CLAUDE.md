@@ -22,9 +22,9 @@ Studienprojekt "Neue Konzepte 2" (DHBW).
 
 ## Architektur — wichtig
 
-Die Anbindung an QWOP (Browser via Selenium/Playwright vs. Python-Reimplementation vs. nur Gym-Wrapper) ist **noch nicht entschieden**. Siehe [`docs/architecture.md`](docs/architecture.md). Bevor Code im `envs/`-Ordner geschrieben wird, muss diese Entscheidung in einem ADR (`docs/adr/`) festgehalten werden.
+Die QWOP-Anbindung läuft über [`smanolloff/qwop-gym`](https://github.com/smanolloff/qwop-gym) (Browser/Chrome via ChromeDriver, optimiert auf 1900+ Steps/s). Smoke-Test 2026-06-02 hat das validiert; Details + Optionen-Vergleich stehen in [`docs/architecture.md`](docs/architecture.md). Größere Architektur-Wechsel (z.B. Migration auf eigenen Box2D-Port) gehören als ADR in `docs/adr/`.
 
-### Recherche-Stand (Stand: 2026-06-02)
+### Recherche-Stand (2026-06-02)
 
 Wir haben **mehrere existierende QWOP-RL-Projekte** evaluiert. Das vielversprechendste ist:
 
@@ -110,8 +110,7 @@ Modelle und Trainings-Metriken **gehören nicht ins Git-Repo**, sondern in W&B. 
 ```bash
 # Setup
 python3.11 -m venv .venv && source .venv/bin/activate
-pip install -r requirements-dev.txt && pip install -e .
-pip install qwop-gym                # bewusst NICHT in requirements.txt — siehe Stolperstein 9
+pip install -r requirements-dev.txt && pip install -e .   # zieht auch qwop-gym mit
 pre-commit install
 cp .env.example .env   # WANDB_API_KEY eintragen
 
@@ -193,7 +192,7 @@ Falls ihr `smanolloff/qwop-gym` lokal aufsetzt — folgendes vorab beachten:
    pkill -f chromedriver
    ```
 
-9. **`qwop-gym` ist NICHT in `requirements.txt`.** Bewusste Entscheidung — wer nur am Code/Doku/Tests arbeitet, braucht keinen ChromeDriver-Stack. Wer trainiert, muss `pip install qwop-gym` separat fahren (siehe „Häufige Befehle"). `scripts/train.py` ist darauf vorbereitet: ohne implementiertes `make_env` bricht es freundlich ab statt zu crashen. Ab ADR-0001 wird das ggf. zum Optional-Extra (`pip install -e .[qwop-gym]`).
+9. **`qwop-gym` läuft erst mit ChromeDriver-Setup.** Die Library ist seit ADR-Klärung in `requirements.txt`, aber der Browser-/Driver-Pfad muss lokal gemacht werden (siehe `SETUP.md` Schritt 5–6). Auf Maschinen ohne Chrome (z.B. CI für reine Lint/Test-Jobs) reicht `pytest` über die jetzigen Tests — die spannen kein Chrome auf.
 
 ### Allgemein
 
