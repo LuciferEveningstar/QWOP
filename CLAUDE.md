@@ -20,6 +20,57 @@ Studienprojekt "Neue Konzepte 2" (DHBW).
 - PyTorch (Backend)
 - pytest / ruff / mypy / pre-commit
 
+## Lokales Setup — auf welcher Maschine bin ich?
+
+> **Für Claude:** Lies diese Sektion **bevor** du jemanden durch das ChromeDriver-/Bootstrap-/Patch-Setup schickst. Auf Maintainer-Maschinen ist das oft schon erledigt — frag/check zuerst, bevor du den vollen Onboarding-Pfad vorschlägst.
+
+### Maintainer-Maschine (Patryks Mac, M-Series)
+
+Auf dieser Maschine **gibt es bereits ein funktionsfähiges qwop-gym-Setup** vom Smoke-Test (2026-06-02):
+
+```
+~/qwop-gym-test/
+├── .venv/                  # alte Test-venv (Python 3.11)
+├── bin/chromedriver        # ChromeDriver 148.0.7778.178 (passend zu Chrome 148)
+├── config/env.yml          # bereits konfiguriert (Browser-/Driver-Pfade)
+├── benchmark.log           # 1920 Steps/s
+├── env_smoketest.py
+├── env_smoketest.log       # 1291 Steps/s
+├── run_train.py
+└── train.log               # 10k PPO-Steps in 22.92 s
+```
+
+Wenn du auf dieser Maschine arbeitest und ChromeDriver brauchst — **nicht neu ziehen**, einfach symlinken:
+
+```bash
+cd /pfad/zu/QWOP
+mkdir -p bin
+ln -sf ~/qwop-gym-test/bin/chromedriver bin/chromedriver
+./bin/chromedriver --version   # ChromeDriver 148.0.7778.178
+```
+
+Vorher prüfen, ob deine Chrome-Version noch matched:
+
+```bash
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --version
+# Match → Driver wiederverwenden, Mismatch → neu ziehen wie in SETUP.md Schritt 5
+```
+
+### Andere Maschinen (Team-Mitglieder, frische Clones)
+
+Voller Setup-Pfad: `SETUP.md` Schritt 5–6. ChromeDriver passend zur Chrome-Major holen → `qwop-gym bootstrap` → `qwop-gym patch`.
+
+### Was Claude zuerst checken sollte
+
+Bevor du einen User durch das ChromeDriver-Setup schickst:
+
+1. `ls ~/qwop-gym-test/bin/chromedriver 2>/dev/null` — existiert ein Driver vom Smoke-Test?
+2. `ls -la <repo>/bin/chromedriver 2>/dev/null` — schon im aktuellen Repo (Symlink)?
+3. `ls <repo>/config/env.yml 2>/dev/null` — bootstrap schon gelaufen?
+4. `ls <repo>/.venv/lib/python*/site-packages/qwop_gym/envs/v1/game/QWOP.min.js 2>/dev/null` — gepatcht?
+
+Erst wenn _eine_ dieser vier Sachen fehlt, das Onboarding starten — und dann gezielt nur den fehlenden Schritt, nicht den ganzen Block aus SETUP.md.
+
 ## Architektur — wichtig
 
 Die QWOP-Anbindung läuft über [`smanolloff/qwop-gym`](https://github.com/smanolloff/qwop-gym) (Browser/Chrome via ChromeDriver, optimiert auf 1900+ Steps/s). Smoke-Test 2026-06-02 hat das validiert; Details + Optionen-Vergleich stehen in [`docs/architecture.md`](docs/architecture.md). Größere Architektur-Wechsel (z.B. Migration auf eigenen Box2D-Port) gehören als ADR in `docs/adr/`.
@@ -104,6 +155,23 @@ Modelle und Trainings-Metriken **gehören nicht ins Git-Repo**, sondern in W&B. 
 - **Keine echten Trainings starten**, ohne dass das vorher abgestimmt wurde — GPU-Zeit ist begrenzt.
 - **Modelle / Logs / Daten** nicht committen (siehe `.gitignore`).
 - **Secrets** (W&B-Keys etc.) nur in `.env`, niemals ins Repo.
+
+### Anti-Choke: vor jedem „Setup-Vorschlag" prüfen, was schon da ist
+
+Wir haben am 2026-06-08 einen Choke-Moment produziert: Claude hat den User durch das volle ChromeDriver-Setup geschickt, obwohl ein lauffähiges Setup unter `~/qwop-gym-test/` schon seit dem Smoke-Test (2026-06-02) lag. Der User hatte berechtigt zurückgefragt: _„Hatten wir das nicht schon getestet?"_
+
+Damit das nicht wieder passiert — bevor du **irgendwelche** Setup-Schritte vorschlägst:
+
+1. **Lies zuerst die Sektion „Lokales Setup — auf welcher Maschine bin ich?"** oben in dieser Datei und führe die vier Pre-Checks aus.
+2. **Frag aktiv, was schon mal lief**, statt aus der Doku einen Onboarding-Pfad zu rekonstruieren — Doku beschreibt _was möglich ist_, nicht _was auf dieser Maschine schon da ist_.
+3. **Schau in den Repo-State, nicht nur in `git status`**: `bin/`, `config/`, `.venv/`, `~/qwop-gym-test/` sind alle gitignored — `git status` sagt _nichts_ über sie aus.
+4. **Beispiel-Snippets in dieser Datei sind Dokumentation, kein Setup-Status.** Wenn CLAUDE.md zeigt _„Beispiel: ChromeDriver nach `~/qwop-gym-test/bin/` ziehen"_, heißt das nicht, dass das auf der aktuellen Maschine getan ist — und nicht, dass es nicht getan ist. Heißt: nachschauen.
+
+### Antitest: was Claude NICHT tun soll
+
+- **Keine `qwop-gym benchmark`/`train_ppo`-Aufrufe direkt aus Claude starten** — Browser-Vordergrund-Drosselung (Stolperstein 12) lässt das hängen. User soll selbst starten, in eigenem Terminal.
+- **Keine echten Trainings** ohne Absprache.
+- **Keine ADRs für offensichtliche Entscheidungen.** ADRs lohnen sich, wenn echte Trade-offs unklar bleiben — nicht für „wir nehmen die Library, die im Smoke-Test funktioniert hat". Letzteres gehört in `docs/architecture.md` oder einen Commit-Body.
 
 ## Häufige Befehle
 
@@ -193,6 +261,23 @@ Falls ihr `smanolloff/qwop-gym` lokal aufsetzt — folgendes vorab beachten:
    ```
 
 9. **`qwop-gym` läuft erst mit ChromeDriver-Setup.** Die Library ist seit ADR-Klärung in `requirements.txt`, aber der Browser-/Driver-Pfad muss lokal gemacht werden (siehe `SETUP.md` Schritt 5–6). Auf Maschinen ohne Chrome (z.B. CI für reine Lint/Test-Jobs) reicht `pytest` über die jetzigen Tests — die spannen kein Chrome auf.
+
+10. **`gym.make("QWOP-v1")` braucht Konstruktor-Argumente, nicht nur `config/env.yml`.** Die qwop-gym-CLI (`qwop-gym train_ppo` etc.) liest `config/env.yml` automatisch — `gym.make()` aber **nicht**. Wer das Env aus eigenem Python aufruft, muss die Pfade selber durchreichen, sonst kommt:
+    ```
+    ValueError: please specify a valid path to a chrome-based browser
+    executable via the `browser` constructor argument
+    ```
+    Unsere `qwop_rl.envs.make_env()` lädt `config/env.yml` selbst und merged die Defaults in die Kwargs — User-Configs in `configs/*.yaml` können einzelne Keys überschreiben.
+
+11. **`bin/` und `config/` gehören NICHT ins Repo.** Sind seit dem qwop-gym-Integration-PR in `.gitignore`. Beide sind maschinenlokal:
+    - `bin/chromedriver` ist ein Plattform-spezifisches Binary (oder ein Symlink dahin)
+    - `config/env.yml` enthält absolute Pfade zu `/Applications/Google Chrome.app/...` und `/Users/<user>/...`
+
+    Achtung Verwechslungs-Falle: **`config/`** (singular, von qwop-gym) ist gitignored, **`configs/`** (plural, unsere Trainings-YAMLs) bleibt im Repo.
+
+12. **Browser-Vordergrund-Drosselung — Trainings aus Claude heraus funktionieren nicht.** macOS drosselt Chrome-Fenster, sobald sie überdeckt sind (Background-Throttling). `qwop-gym benchmark`/`train_ppo` hängen dann scheinbar — kein Output, Python-Prozess hat 0 % CPU, Frames pro Sekunde fallen auf ~0. Symptom: `ps -p <pid> -o time` zeigt seit Minuten dieselbe CPU-Zeit. Lösung: das kleine 660×585-Browserfenster (Position 650,130) muss vorne sein.
+
+    **Konsequenz für Claude:** echte qwop-gym-Trainings/Benchmarks NICHT direkt aus dem Tool aufrufen — das Terminal überdeckt zwangsläufig den Browser. Stattdessen dem User ein konkretes Kommando in die Hand geben („führe in einem eigenen Terminal aus, klick danach das Browserfenster vorne") und ihn das selbst starten lassen. Code-Validierung (Env spawnt sauber, schließt sauber, observation/action-Spaces stimmen) geht aber problemlos — ein einzelner `make_env() + close()` braucht den Browser-Vordergrund nicht.
 
 ### Allgemein
 
