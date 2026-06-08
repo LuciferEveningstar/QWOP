@@ -111,8 +111,12 @@ Modelle und Trainings-Metriken **gehören nicht ins Git-Repo**, sondern in W&B. 
 # Setup
 python3.11 -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt && pip install -e .
+pip install qwop-gym                # bewusst NICHT in requirements.txt — siehe Stolperstein 9
 pre-commit install
 cp .env.example .env   # WANDB_API_KEY eintragen
+
+# Sanity-Check (frischer Clone — soll alles grün laufen)
+ruff check . && ruff format --check . && mypy && pytest
 
 # Entwicklung
 ruff check . && ruff format .
@@ -188,6 +192,8 @@ Falls ihr `smanolloff/qwop-gym` lokal aufsetzt — folgendes vorab beachten:
    pkill -f "user-agent=Chrome-"
    pkill -f chromedriver
    ```
+
+9. **`qwop-gym` ist NICHT in `requirements.txt`.** Bewusste Entscheidung — wer nur am Code/Doku/Tests arbeitet, braucht keinen ChromeDriver-Stack. Wer trainiert, muss `pip install qwop-gym` separat fahren (siehe „Häufige Befehle"). `scripts/train.py` ist darauf vorbereitet: ohne implementiertes `make_env` bricht es freundlich ab statt zu crashen. Ab ADR-0001 wird das ggf. zum Optional-Extra (`pip install -e .[qwop-gym]`).
 
 ### Allgemein
 
