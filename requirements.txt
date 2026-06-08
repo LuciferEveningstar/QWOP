@@ -1,8 +1,12 @@
 # Core RL
 stable-baselines3>=2.3.0
+sb3-contrib>=2.3.0
 gymnasium>=0.29.0
 torch>=2.2.0
 numpy>=1.26.0
+
+# QWOP environment (Browser-Anbindung via qwop-gym, siehe ADR-Diskussion in docs/architecture.md)
+qwop-gym>=1.0.1
 
 # Logging & Tracking
 tensorboard>=2.15.0
@@ -12,10 +16,5 @@ python-dotenv>=1.0.0
 # Utilities
 pyyaml>=6.0
 tqdm>=4.66.0
+rich>=13.0.0
 matplotlib>=3.8.0
-
-# (Browser-Anbindung — wird aktiviert, sobald Architektur entschieden ist)
-# selenium>=4.18.0
-# playwright>=1.42.0
-# pillow>=10.2.0
-# opencv-python>=4.9.0
