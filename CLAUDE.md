@@ -62,6 +62,54 @@ Vorher prüfen, ob deine Chrome-Version noch matched:
 
 Voller Setup-Pfad: `SETUP.md` Schritt 5–6. ChromeDriver passend zur Chrome-Major holen → `qwop-gym bootstrap` → `qwop-gym patch`.
 
+### Repo aus iCloud-Documents rausziehen (Umzugs-Rezept)
+
+Wenn euer Mac `~/Documents/` per iCloud Drive synchronisiert (Diagnose: `ls -la@e ~/Documents | head` — `com.apple.file-provider-domain-id` als xattr ist der Beweis), könnt ihr qwop-gym dort **nicht** zum Laufen kriegen — siehe Stolperstein 13. Lösung: Repo umziehen, z.B. nach `~/dev/QWOP/`. Reproduzierbares Rezept (am 2026-06-08 auf der Maintainer-Maschine durchgespielt):
+
+```bash
+# 1. Hängende Chrome/chromedriver-Reste killen
+pkill -f "user-agent=Chrome-" 2>/dev/null
+pkill -f chromedriver 2>/dev/null
+
+# 2. git clean — alles committed/gepusht? Sonst hier abbrechen.
+cd <alter-pfad>/QWOP
+git status   # muss "nothing to commit, working tree clean" sagen
+git push     # ungepushte Branches mitnehmen
+
+# 3. .venv VOR dem Umzug löschen (1.4 GB sparen — venv-Pfade sind ohnehin
+#    absolut und müssten nach dem mv komplett neu gebaut werden)
+rm -rf .venv
+
+# 4. Repo verschieben
+cd /
+mv "<alter-pfad>/QWOP" ~/dev/QWOP
+cd ~/dev/QWOP
+
+# 5. Neue venv + alle Deps
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements-dev.txt
+pip install -e .
+
+# 6. Alte config/ wegwerfen (enthält noch den alten Driver-Pfad)
+rm -rf config/
+
+# 7. qwop-gym bootstrap mit neuem Pfad
+printf "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\n%s/bin/chromedriver\n" "$PWD" | qwop-gym bootstrap
+grep driver config/env.yml   # sollte ~/dev/QWOP/bin/chromedriver zeigen
+
+# 8. QWOP.min.js patchen (für die NEUE venv — qwop-gym-Library ist hier eine frische Kopie)
+curl -sL https://www.foddy.net/QWOP.min.js | qwop-gym patch
+
+# 9. Sanity-Check
+ruff check . && ruff format --check . && mypy && pytest
+python -c "from qwop_rl.envs import make_env; e=make_env({'id':'QWOP-v1'}); o,_=e.reset(); print('reset OK', o.shape); e.close()"
+# erwartet: reset OK (60,)
+```
+
+**Was beim Umzug überlebt:** `bin/chromedriver` ist ein absoluter Symlink auf `~/qwop-gym-test/bin/chromedriver` — überlebt das `mv` problemlos. `.env` mit dem W&B-Key zieht mit. `.git/` und alle Commits zieht mit. **`.venv` und `config/` müssen neu** (Pfade absolut). **Bei iCloud-Documents-Block:** mit dem Umzug ist `ERR_ACCESS_DENIED` weg, Chrome lädt das Spiel sofort.
+
 ### Was Claude zuerst checken sollte
 
 Bevor du einen User durch das ChromeDriver-Setup schickst:
@@ -72,6 +120,78 @@ Bevor du einen User durch das ChromeDriver-Setup schickst:
 4. `ls <repo>/.venv/lib/python*/site-packages/qwop_gym/envs/v1/game/QWOP.min.js 2>/dev/null` — gepatcht?
 
 Erst wenn _eine_ dieser vier Sachen fehlt, das Onboarding starten — und dann gezielt nur den fehlenden Schritt, nicht den ganzen Block aus SETUP.md.
+
+## So startest du Trainings (Run-Anleitung)
+
+> **Für den User:** Die Befehle in dieser Sektion **nicht aus Claude heraus** laufen lassen — Claude überdeckt zwangsläufig den Browser, macOS drosselt ihn dann auf 0 fps (Stolperstein 12). Selbst in einem Terminal starten und das kleine Browserfenster (660×585, Position 650,130) **vorne lassen**.
+>
+> **Für Claude:** Wenn ein User trainieren will, dieses Rezept verlinken/zeigen, NICHT selbst ausführen.
+
+### Vorbedingungen
+
+- ChromeDriver-Setup steht (siehe „Lokales Setup" oben — Pre-Check 1–4 alle ✓)
+- venv aktiviert (`source .venv/bin/activate`)
+- `.env` mit gültigem `WANDB_API_KEY` (Connection-Test: `python -c "from dotenv import load_dotenv; load_dotenv(); import wandb; wandb.login(verify=True); print('OK')"`)
+
+### Variante A: Reine qwop-gym-CLI (am schnellsten zum ersten Run)
+
+```bash
+# 1. Benchmark — nur Env-Geschwindigkeit messen, kein Lernen
+qwop-gym benchmark
+# erwartet auf M-Series: ~1900 Steps/s in ~5s
+
+# 2. Mini-PPO-Training — qwop-gym's eingebauter Trainer, ~3 Min auf M2
+qwop-gym train_ppo
+# Default: 100k Steps, Modell landet in data/PPO-<run-id>/model.zip
+# loggt NICHT zu W&B — nur lokal
+
+# 2b. Mini-PPO mit W&B-Logging
+qwop-gym -c config/wandb/ppo.yml train_ppo
+# Erstes Mal: einmaliger W&B-Login-Prompt (oder Key aus .env)
+# Live-Charts auf wandb.ai/qwop-rl/qwop-rl-dhbw
+```
+
+### Variante B: Unser scripts/train.py (für eigene Experimente / Konfigs)
+
+```bash
+# Default-Run gegen configs/ppo_default.yaml — 1M Steps, ~2-3h auf M-Series
+python scripts/train.py --config configs/ppo_default.yaml
+
+# Mit eigenem Namen + Tags (siehe wandb-setup.md für Konventionen)
+python scripts/train.py \
+  --config configs/ppo_default.yaml \
+  --run-name pl-2026-06-08-baseline \
+  --tags baseline experiment
+
+# Quick-Debug ohne W&B-Roundtrip
+python scripts/train.py --config configs/ppo_default.yaml --no-wandb
+```
+
+### Beim ersten Mal: Mini-Smoke-Test BEVOR ein langer Lauf
+
+Bevor ihr ein 1M-Steps-Training (~3h) anstoßt, fahrt einen 10k-Step-Mini-Run, um sicherzugehen dass:
+- W&B-Login klappt und der Run im richtigen Workspace landet
+- Modell-Save am Ende durchläuft (nicht erst nach 3h sehen, dass `models/`-Pfad falsch war)
+- Browser stabil im Vordergrund bleibt
+
+Dafür eigene Config nehmen / `total_timesteps: 10_000` temporär in `configs/ppo_default.yaml` setzen, oder `qwop-gym train_ppo` (Default 100k) als Ersatz nutzen.
+
+### Während das Training läuft
+
+- **Browser nicht überdecken** — bei Bedarf zweiten Monitor nutzen oder das Fenster auf einen freien Screenbereich ziehen
+- **Bildschirm nicht sperren / schlafen lassen** — drosselt ebenfalls (`caffeinate -d &` hilft, mit `pkill caffeinate` wieder ausschalten)
+- **W&B live mitlesen** auf [wandb.ai/qwop-rl/qwop-rl-dhbw](https://wandb.ai/qwop-rl/qwop-rl-dhbw) oder lokal `tensorboard --logdir logs/`
+- **Trainings-Browser nie schließen** — nur via Skript-Ende oder `pkill` (siehe Stolperstein 8)
+
+### Nach dem Training
+
+- Modell liegt in `models/<run-name>/final.zip` (für `scripts/train.py`) bzw. `data/PPO-<id>/model.zip` (für `qwop-gym train_ppo`)
+- Wenn der Run einen Best-of-Group setzt: in W&B-UI `tag:best` setzen + Artifact als „Production"/„Latest" aliasen (siehe `docs/wandb-setup.md`)
+- Verwaiste Chrome-Prozesse putzen, falls was hängt:
+  ```bash
+  pkill -f "user-agent=Chrome-"
+  pkill -f chromedriver
+  ```
 
 ## Architektur — wichtig
 
