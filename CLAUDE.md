@@ -26,6 +26,8 @@ Studienprojekt "Neue Konzepte 2" (DHBW).
 
 ### Maintainer-Maschine (Patryks Mac, M-Series)
 
+**Aktueller Repo-Pfad:** `~/dev/QWOP/` (umgezogen am 2026-06-08, weg von `~/Documents/DHBW/...` wegen iCloud-Documents-TCC, siehe Stolperstein 13).
+
 Auf dieser Maschine **gibt es bereits ein funktionsfähiges qwop-gym-Setup** vom Smoke-Test (2026-06-02):
 
 ```
@@ -292,6 +294,8 @@ Falls ihr `smanolloff/qwop-gym` lokal aufsetzt — folgendes vorab beachten:
     Wir haben das am 2026-06-08 in einer 12-Agenten-Workflow-Diagnose verifiziert: alle anderen Hypothesen (URL-Encoding, Incognito-Mode, ChromeDriver-Mismatch, Quarantäne-xattrs) wurden ausgeschlossen — übrig blieb iCloud-Documents-TCC.
 
     **Robuster Fix:** Repo aus `~/Documents/` rausziehen (z.B. `~/dev/QWOP/`). venv muss neu gebaut werden (venv-Pfade sind absolut), `config/env.yml` muss neue Driver-Pfade kriegen. Versuch zuerst trotzdem: Privacy & Security → **„Files and Folders"** (NICHT „Full Disk Access") → Chrome → Documents-Ordner aktivieren — manchmal reicht das, oft nicht.
+
+    **2026-06-08, verifiziert:** Genau dieses Problem hatten wir auf der Maintainer-Maschine. Full Disk Access war für Chrome aktiviert — `qwop-gym benchmark` lief trotzdem in `ERR_ACCESS_DENIED`. Nach Umzug von `~/Documents/DHBW/Neue Konzepte 2/QWOP/` nach `~/dev/QWOP/` (`mv`, neue venv, `qwop-gym bootstrap`/`patch` neu) lief `make_env() + reset()` sofort sauber durch. Hypothese bestätigt.
 
     Auf Windows ist das Pendant der OneDrive-Pfad — siehe SETUP.md, Schritt 2.
 
