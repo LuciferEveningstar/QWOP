@@ -279,6 +279,22 @@ Falls ihr `smanolloff/qwop-gym` lokal aufsetzt — folgendes vorab beachten:
 
     **Konsequenz für Claude:** echte qwop-gym-Trainings/Benchmarks NICHT direkt aus dem Tool aufrufen — das Terminal überdeckt zwangsläufig den Browser. Stattdessen dem User ein konkretes Kommando in die Hand geben („führe in einem eigenen Terminal aus, klick danach das Browserfenster vorne") und ihn das selbst starten lassen. Code-Validierung (Env spawnt sauber, schließt sauber, observation/action-Spaces stimmen) geht aber problemlos — ein einzelner `make_env() + close()` braucht den Browser-Vordergrund nicht.
 
+13. **macOS-Datenschutz: `~/Documents` blockiert Chromes file://-Zugriff — auch mit Full Disk Access.** Wenn das Repo unter `~/Documents/...` liegt (z.B. weil's ein DHBW-Studienprojekt ist), öffnet Chrome die `QWOP.html` im venv per `file://` — und wird von macOS blockiert:
+    ```
+    Access to the file was denied
+    file:///Users/.../QWOP/.venv/lib/python3.11/site-packages/qwop_gym/envs/v1/game/QWOP.html?...
+    ERR_ACCESS_DENIED
+    ```
+    Symptom: Chrome-Fenster geht auf, zeigt das obige Sad-Face, qwop-gym hängt bei `Loading configuration from config/benchmark.yml`. Auf der alten Smoke-Test-Maschine `~/qwop-gym-test/` trat das nicht auf, weil `~/qwop-gym-test/` nicht TCC-geschützt ist — `~/Documents/` ist's.
+
+    **Wichtig:** Das **„Full Disk Access"-Toggle in System Settings reicht NICHT**. macOS 26 (und neuer) hat für iCloud-managed Documents eine **separate** TCC-Schutzschicht. Diagnose: führe `ls -la@e ~/Documents | head` aus — wenn da `com.apple.file-provider-domain-id` als xattr steht, ist dein Documents-Ordner iCloud-managed und FDA hilft nicht.
+
+    Wir haben das am 2026-06-08 in einer 12-Agenten-Workflow-Diagnose verifiziert: alle anderen Hypothesen (URL-Encoding, Incognito-Mode, ChromeDriver-Mismatch, Quarantäne-xattrs) wurden ausgeschlossen — übrig blieb iCloud-Documents-TCC.
+
+    **Robuster Fix:** Repo aus `~/Documents/` rausziehen (z.B. `~/dev/QWOP/`). venv muss neu gebaut werden (venv-Pfade sind absolut), `config/env.yml` muss neue Driver-Pfade kriegen. Versuch zuerst trotzdem: Privacy & Security → **„Files and Folders"** (NICHT „Full Disk Access") → Chrome → Documents-Ordner aktivieren — manchmal reicht das, oft nicht.
+
+    Auf Windows ist das Pendant der OneDrive-Pfad — siehe SETUP.md, Schritt 2.
+
 ### Allgemein
 
 - Selenium-Driver muss zur Chrome-Version passen (siehe oben).
