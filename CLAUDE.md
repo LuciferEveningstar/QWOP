@@ -195,7 +195,7 @@ Dafür eigene Config nehmen / `total_timesteps: 10_000` temporär in `configs/pp
 
 ## Architektur — wichtig
 
-Die QWOP-Anbindung läuft über [`smanolloff/qwop-gym`](https://github.com/smanolloff/qwop-gym) (Browser/Chrome via ChromeDriver, optimiert auf 1900+ Steps/s). Smoke-Test 2026-06-02 hat das validiert; Details + Optionen-Vergleich stehen in [`docs/architecture.md`](docs/architecture.md). Größere Architektur-Wechsel (z.B. Migration auf eigenen Box2D-Port) gehören als ADR in `docs/adr/`.
+Die QWOP-Anbindung läuft über [`smanolloff/qwop-gym`](https://github.com/smanolloff/qwop-gym) (Browser/Chrome via ChromeDriver, optimiert auf 1900+ Steps/s). **Diese Entscheidung steht** — Smoke-Test 2026-06-02 hat sie validiert, qwop-gym ist seit Commit `f74b193` als Dependency gesetzt und in `src/qwop_rl/envs/__init__.py` eingebunden. Details + Optionen-Vergleich stehen in [`docs/architecture.md`](docs/architecture.md). Ein eigenes ADR-0001 ist dafür **nicht mehr nötig** — die Entscheidung ist über Smoke-Test, Architektur-Doku und Code dokumentiert; ADRs sparen wir uns für echte offene Trade-offs (z.B. wenn wir mal weg von Browser auf Box2D-Port migrieren wollen).
 
 ### Recherche-Stand (2026-06-02)
 
@@ -215,7 +215,42 @@ Andere geprüfte Projekte (alle weniger geeignet):
 - `Kirkados/QWOP` — Box2D-Reimplementation, aber TF 1.15 (uralt), keine Lizenz
 - 6 weitere (siehe Recherche-Notes) — alle entweder JS-only, tot, oder schlechter dokumentiert
 
-**Empfehlungs-Tendenz:** qwop-gym als Basis nehmen, eigener wissenschaftlicher Beitrag in Reward-Engineering / Algorithmen-Vergleich / Hyperparameter-Studie / Imitation-Learning. Endgültige Entscheidung folgt in **ADR-0001** nach Smoke-Test-Abschluss.
+**Empfehlungs-Tendenz:** qwop-gym als Basis nehmen, eigener wissenschaftlicher Beitrag in Reward-Engineering / Algorithmen-Vergleich / Hyperparameter-Studie / Imitation-Learning. **Stand 2026-06-08 entschieden:** qwop-gym ist gesetzt (Code in `src/qwop_rl/envs/`, Dependency in `requirements.txt`). Welche der Forschungsrichtungen das Studienprojekt-Thema wird, ist noch offen — wird im Team festgelegt, kein ADR nötig.
+
+## Repo-Stand (Stand 2026-06-11)
+
+Damit Claude (und alle anderen) sich nicht erst durch alle Files lesen müssen — was steht, was fehlt:
+
+### Steht ✅
+
+- **Setup & Doku:** `README.md`, `SETUP.md` (Win + macOS), `docs/onboarding.md`, `docs/concepts.md`, `docs/architecture.md`, `docs/wandb-setup.md`, `docs/CONTRIBUTING.md`. ADR-Template (`docs/adr/0000-template.md`) liegt für Bedarfsfall bereit, **keine ADRs geschrieben**.
+- **Build:** `pyproject.toml` (Python 3.11 fixiert via `requires-python = ">=3.11,<3.12"`), `requirements.txt`, `requirements-dev.txt`, Ruff/MyPy/Pytest konfiguriert, Pre-Commit-Hooks.
+- **Package-Skelett:** `src/qwop_rl/{envs,agents,utils}/__init__.py` mit Version 0.1.0. `agents/` und `utils/` sind nur Stubs (Docstring-only).
+- **Env-Anbindung:** `src/qwop_rl/envs/__init__.py` liefert `make_env()`, das `config/env.yml` einliest und Defaults mit User-Kwargs merged. Behebt Stolperstein 10.
+- **Trainings-Skript:** `scripts/train.py` — vollständig, lädt YAML-Config, baut `DummyVecEnv`, startet SB3-PPO, loggt zu W&B (mit `WandbCallback` + `sync_tensorboard`), speichert Modell nach `models/<run-name>/final.zip`. Unterstützt `--run-name`, `--tags`, `--no-wandb`.
+- **Default-Config:** `configs/ppo_default.yaml` — 1M Timesteps, 4 parallele Envs, PPO-Default-Hyperparameter, Seed 42. Achtung: `env.id` steht dort noch auf `QwopEnv-v0` — Kommentar im File sagt „placeholder". Vor dem ersten echten Lauf auf `QWOP-v1` umstellen (oder `make_env` setzt sowieso den Default — siehe `envs/__init__.py:25`).
+- **Tests:** `tests/test_smoke.py` (Package importierbar, Version gesetzt) und `tests/envs/test_make_env.py` (Dummy-Env, prüft kwargs-Forwarding ohne Chrome).
+- **W&B:** Workspace `wandb.ai/qwop-rl/qwop-rl-dhbw` existiert, `.env` lokal mit Key gefüllt, `.env.example` als Vorlage. Connection-Test in CLAUDE.md dokumentiert.
+- **Lokales qwop-gym-Setup auf Maintainer-Maschine:** ChromeDriver 148 als Symlink auf `~/qwop-gym-test/bin/chromedriver`, `config/env.yml` per `qwop-gym bootstrap` erzeugt, `QWOP.min.js` in `.venv` gepatcht. Smoke-Test 2026-06-02: Benchmark 1920 Steps/s, 10k PPO-Steps in 22.92 s. Repo am 2026-06-08 von `~/Documents/...` nach `~/dev/QWOP/` umgezogen (iCloud-TCC, Stolperstein 13).
+- **Branch:** `feat/qwop-gym-integration` ist clean — qwop-gym-Integration committed (`f74b193`), `make_env`/Test-Updates (`477ffb8`), Doku-Updates (`7f0fbf6`, `c274ffc`, `6655dde`).
+
+### Steht NICHT (offene Punkte)
+
+- **`agents/`-Modul:** kein eigener Agent-Wrapper geschrieben — `scripts/train.py` instantiiert SB3-PPO direkt. Wenn wir einen Layer drumherum wollen (Checkpoints, Eval-Runs, Video-Recording — siehe `docs/architecture.md`), liegt das hier.
+- **`utils/`-Modul:** leer (nur Docstring). Config-Loader und Logging-Helper sind aktuell inline in `train.py`.
+- **`scripts/eval.py`/`scripts/play.py`:** in `docs/architecture.md` als geplant erwähnt, **nicht vorhanden**.
+- **Erstes Mini-Training mit `scripts/train.py` + W&B-Roundtrip:** noch nicht gefahren. Bevor jemand 1M Steps (~3h) startet → 10k-Step-Smoke fahren (siehe Run-Anleitung weiter oben).
+- **`configs/ppo_default.yaml` hat `env.id: QwopEnv-v0`** (Platzhalter aus der Setup-Phase). Funktioniert in der Praxis, weil `make_env` ohne expliziten `id`-Key auf `QWOP-v1` defaultet — aber der String im YAML ist irreführend. Beim ersten echten Lauf glattziehen.
+- **Forschungsfrage:** noch nicht entschieden (siehe oben).
+- **PR / Merge nach `main`:** Branch `feat/qwop-gym-integration` ist reif, aber nicht gemerged.
+- **CI:** `.github/` existiert, Inhalt nicht in dieser Sektion dokumentiert — vor Merge prüfen, ob die Workflows durchlaufen.
+
+### Logische nächste Schritte
+
+1. **10k-Step-Mini-Smoke mit `scripts/train.py`** — verifiziert die ganze W&B-Pipeline end-to-end. Vorher `total_timesteps` in `configs/ppo_default.yaml` temporär auf 10_000 setzen oder eine eigene `configs/ppo_smoke.yaml` anlegen. **Muss der User selbst starten** (Stolperstein 12).
+2. **`feat/qwop-gym-integration` als PR rausschicken**, sobald Mini-Smoke grün.
+3. **Forschungsfrage festlegen** (Reward-Engineering / Algo-Vergleich / Imitation-Learning / …) — bestimmt, welche Configs/Skripte als nächstes kommen.
+
 
 ## Projektstruktur
 
@@ -253,7 +288,7 @@ docs/          # Architektur + ADRs + Onboarding
   ```
   feat(envs): QWOP-Browser-Wrapper hinzugefügt
   fix(agents): Reward-Normalisierung korrigiert
-  docs(adr): ADR-0001 Browser-Anbindung
+  docs(architecture): Anbindungs-Optionen ergänzt
   ```
 - **PRs:** Mindestens ein Review vor Merge. Squash-Merge auf `main`.
 - Niemals direkt auf `main` pushen.
@@ -273,7 +308,7 @@ Modelle und Trainings-Metriken **gehören nicht ins Git-Repo**, sondern in W&B. 
 ## Workflows für Claude
 
 - **Vor größeren Änderungen** zuerst Plan vorschlagen / EnterPlanMode nutzen.
-- **Architektur-Entscheidungen** als ADR in `docs/adr/` festhalten (siehe `docs/adr/0000-template.md`).
+- **Architektur-Entscheidungen** nur dann als ADR in `docs/adr/` festhalten, wenn echte Trade-offs unklar bleiben (Template: `docs/adr/0000-template.md`). Für Entscheidungen, die der Smoke-Test oder ein Commit-Body ohnehin schon sauber dokumentiert, kein ADR — siehe „Antitest" weiter unten.
 - **Keine echten Trainings starten**, ohne dass das vorher abgestimmt wurde — GPU-Zeit ist begrenzt.
 - **Modelle / Logs / Daten** nicht committen (siehe `.gitignore`).
 - **Secrets** (W&B-Keys etc.) nur in `.env`, niemals ins Repo.
@@ -382,7 +417,7 @@ Falls ihr `smanolloff/qwop-gym` lokal aufsetzt — folgendes vorab beachten:
    pkill -f chromedriver
    ```
 
-9. **`qwop-gym` läuft erst mit ChromeDriver-Setup.** Die Library ist seit ADR-Klärung in `requirements.txt`, aber der Browser-/Driver-Pfad muss lokal gemacht werden (siehe `SETUP.md` Schritt 5–6). Auf Maschinen ohne Chrome (z.B. CI für reine Lint/Test-Jobs) reicht `pytest` über die jetzigen Tests — die spannen kein Chrome auf.
+9. **`qwop-gym` läuft erst mit ChromeDriver-Setup.** Die Library ist in `requirements.txt`, aber der Browser-/Driver-Pfad muss lokal gemacht werden (siehe `SETUP.md` Schritt 5–6). Auf Maschinen ohne Chrome (z.B. CI für reine Lint/Test-Jobs) reicht `pytest` über die jetzigen Tests — die spannen kein Chrome auf.
 
 10. **`gym.make("QWOP-v1")` braucht Konstruktor-Argumente, nicht nur `config/env.yml`.** Die qwop-gym-CLI (`qwop-gym train_ppo` etc.) liest `config/env.yml` automatisch — `gym.make()` aber **nicht**. Wer das Env aus eigenem Python aufruft, muss die Pfade selber durchreichen, sonst kommt:
     ```
