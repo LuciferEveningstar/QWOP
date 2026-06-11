@@ -109,6 +109,7 @@ def main() -> int:
 
     # ── Env + Agent ───────────────────────────────────────────────────────
     from stable_baselines3 import PPO
+    from stable_baselines3.common.callbacks import CheckpointCallback
     from stable_baselines3.common.vec_env import DummyVecEnv
 
     from qwop_rl.envs import make_env
@@ -132,27 +133,49 @@ def main() -> int:
 
     ppo_cfg = dict(config.get("ppo", {}))
     policy = ppo_cfg.pop("policy", "MlpPolicy")
-    model = PPO(
-        policy,
-        vec_env,
-        verbose=1,
-        tensorboard_log=str(log_dir),
-        seed=int(seed) if seed is not None else None,
-        **ppo_cfg,
+    model_load_file = training_cfg.get("model_load_file")
+    reset_num_timesteps = True
+
+    if model_load_file:
+        print(f"[train] Loading model from {model_load_file}")
+        model = PPO.load(model_load_file, env=vec_env, tensorboard_log=str(log_dir))
+        reset_num_timesteps = False
+    else:
+        model = PPO(
+            policy,
+            vec_env,
+            verbose=1,
+            tensorboard_log=str(log_dir),
+            seed=int(seed) if seed is not None else None,
+            **ppo_cfg,
+        )
+
+    checkpoint_freq = int(training_cfg.get("checkpoint_freq", 1_000_000))
+    checkpoint_cb = CheckpointCallback(
+        save_freq=checkpoint_freq,
+        save_path=str(model_dir),
+        name_prefix="ckpt",
     )
 
-    callback = None
+    callbacks: list = [checkpoint_cb]
     if use_wandb and wandb_run is not None:
         from wandb.integration.sb3 import WandbCallback
 
-        callback = WandbCallback(
-            model_save_path=str(model_dir),
-            verbose=2,
+        callbacks.append(
+            WandbCallback(
+                model_save_path=str(model_dir),
+                verbose=2,
+            )
         )
 
     total_timesteps = int(training_cfg.get("total_timesteps", 100_000))
     print(f"[train] Starting PPO for {total_timesteps:,} timesteps (n_envs={n_envs}).")
-    model.learn(total_timesteps=total_timesteps, callback=callback)
+    model.learn(
+        total_timesteps=total_timesteps,
+        callback=callbacks,
+        progress_bar=True,
+        reset_num_timesteps=reset_num_timesteps,
+    )
 
     final_path = model_dir / "final.zip"
     model.save(final_path)

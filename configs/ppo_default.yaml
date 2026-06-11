@@ -2,7 +2,7 @@
 algorithm: PPO
 
 env:
-  id: QwopEnv-v0          # noch nicht registriert
+  id: QWOP-v1
   kwargs: {}
 
 ppo:
@@ -19,9 +19,10 @@ ppo:
   max_grad_norm: 0.5
 
 training:
-  total_timesteps: 1_000_000
+  total_timesteps: 12_500_000
+  model_load_file: "models/ppo_default/final_27.5m.zip"
   seed: 42
-  n_envs: 4
+  n_envs: 1
   eval_freq: 10_000
   checkpoint_freq: 50_000
 
