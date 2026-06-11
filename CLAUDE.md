@@ -26,6 +26,8 @@ Studienprojekt "Neue Konzepte 2" (DHBW).
 
 ### Maintainer-Maschine (Patryks Mac, M-Series)
 
+**Aktueller Repo-Pfad:** `~/dev/QWOP/` (umgezogen am 2026-06-08, weg von `~/Documents/DHBW/...` wegen iCloud-Documents-TCC, siehe Stolperstein 13).
+
 Auf dieser Maschine **gibt es bereits ein funktionsfähiges qwop-gym-Setup** vom Smoke-Test (2026-06-02):
 
 ```
@@ -60,6 +62,54 @@ Vorher prüfen, ob deine Chrome-Version noch matched:
 
 Voller Setup-Pfad: `SETUP.md` Schritt 5–6. ChromeDriver passend zur Chrome-Major holen → `qwop-gym bootstrap` → `qwop-gym patch`.
 
+### Repo aus iCloud-Documents rausziehen (Umzugs-Rezept)
+
+Wenn euer Mac `~/Documents/` per iCloud Drive synchronisiert (Diagnose: `ls -la@e ~/Documents | head` — `com.apple.file-provider-domain-id` als xattr ist der Beweis), könnt ihr qwop-gym dort **nicht** zum Laufen kriegen — siehe Stolperstein 13. Lösung: Repo umziehen, z.B. nach `~/dev/QWOP/`. Reproduzierbares Rezept (am 2026-06-08 auf der Maintainer-Maschine durchgespielt):
+
+```bash
+# 1. Hängende Chrome/chromedriver-Reste killen
+pkill -f "user-agent=Chrome-" 2>/dev/null
+pkill -f chromedriver 2>/dev/null
+
+# 2. git clean — alles committed/gepusht? Sonst hier abbrechen.
+cd <alter-pfad>/QWOP
+git status   # muss "nothing to commit, working tree clean" sagen
+git push     # ungepushte Branches mitnehmen
+
+# 3. .venv VOR dem Umzug löschen (1.4 GB sparen — venv-Pfade sind ohnehin
+#    absolut und müssten nach dem mv komplett neu gebaut werden)
+rm -rf .venv
+
+# 4. Repo verschieben
+cd /
+mv "<alter-pfad>/QWOP" ~/dev/QWOP
+cd ~/dev/QWOP
+
+# 5. Neue venv + alle Deps
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements-dev.txt
+pip install -e .
+
+# 6. Alte config/ wegwerfen (enthält noch den alten Driver-Pfad)
+rm -rf config/
+
+# 7. qwop-gym bootstrap mit neuem Pfad
+printf "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\n%s/bin/chromedriver\n" "$PWD" | qwop-gym bootstrap
+grep driver config/env.yml   # sollte ~/dev/QWOP/bin/chromedriver zeigen
+
+# 8. QWOP.min.js patchen (für die NEUE venv — qwop-gym-Library ist hier eine frische Kopie)
+curl -sL https://www.foddy.net/QWOP.min.js | qwop-gym patch
+
+# 9. Sanity-Check
+ruff check . && ruff format --check . && mypy && pytest
+python -c "from qwop_rl.envs import make_env; e=make_env({'id':'QWOP-v1'}); o,_=e.reset(); print('reset OK', o.shape); e.close()"
+# erwartet: reset OK (60,)
+```
+
+**Was beim Umzug überlebt:** `bin/chromedriver` ist ein absoluter Symlink auf `~/qwop-gym-test/bin/chromedriver` — überlebt das `mv` problemlos. `.env` mit dem W&B-Key zieht mit. `.git/` und alle Commits zieht mit. **`.venv` und `config/` müssen neu** (Pfade absolut). **Bei iCloud-Documents-Block:** mit dem Umzug ist `ERR_ACCESS_DENIED` weg, Chrome lädt das Spiel sofort.
+
 ### Was Claude zuerst checken sollte
 
 Bevor du einen User durch das ChromeDriver-Setup schickst:
@@ -71,9 +121,81 @@ Bevor du einen User durch das ChromeDriver-Setup schickst:
 
 Erst wenn _eine_ dieser vier Sachen fehlt, das Onboarding starten — und dann gezielt nur den fehlenden Schritt, nicht den ganzen Block aus SETUP.md.
 
+## So startest du Trainings (Run-Anleitung)
+
+> **Für den User:** Die Befehle in dieser Sektion **nicht aus Claude heraus** laufen lassen — Claude überdeckt zwangsläufig den Browser, macOS drosselt ihn dann auf 0 fps (Stolperstein 12). Selbst in einem Terminal starten und das kleine Browserfenster (660×585, Position 650,130) **vorne lassen**.
+>
+> **Für Claude:** Wenn ein User trainieren will, dieses Rezept verlinken/zeigen, NICHT selbst ausführen.
+
+### Vorbedingungen
+
+- ChromeDriver-Setup steht (siehe „Lokales Setup" oben — Pre-Check 1–4 alle ✓)
+- venv aktiviert (`source .venv/bin/activate`)
+- `.env` mit gültigem `WANDB_API_KEY` (Connection-Test: `python -c "from dotenv import load_dotenv; load_dotenv(); import wandb; wandb.login(verify=True); print('OK')"`)
+
+### Variante A: Reine qwop-gym-CLI (am schnellsten zum ersten Run)
+
+```bash
+# 1. Benchmark — nur Env-Geschwindigkeit messen, kein Lernen
+qwop-gym benchmark
+# erwartet auf M-Series: ~1900 Steps/s in ~5s
+
+# 2. Mini-PPO-Training — qwop-gym's eingebauter Trainer, ~3 Min auf M2
+qwop-gym train_ppo
+# Default: 100k Steps, Modell landet in data/PPO-<run-id>/model.zip
+# loggt NICHT zu W&B — nur lokal
+
+# 2b. Mini-PPO mit W&B-Logging
+qwop-gym -c config/wandb/ppo.yml train_ppo
+# Erstes Mal: einmaliger W&B-Login-Prompt (oder Key aus .env)
+# Live-Charts auf wandb.ai/qwop-rl/qwop-rl-dhbw
+```
+
+### Variante B: Unser scripts/train.py (für eigene Experimente / Konfigs)
+
+```bash
+# Default-Run gegen configs/ppo_default.yaml — 1M Steps, ~2-3h auf M-Series
+python scripts/train.py --config configs/ppo_default.yaml
+
+# Mit eigenem Namen + Tags (siehe wandb-setup.md für Konventionen)
+python scripts/train.py \
+  --config configs/ppo_default.yaml \
+  --run-name pl-2026-06-08-baseline \
+  --tags baseline experiment
+
+# Quick-Debug ohne W&B-Roundtrip
+python scripts/train.py --config configs/ppo_default.yaml --no-wandb
+```
+
+### Beim ersten Mal: Mini-Smoke-Test BEVOR ein langer Lauf
+
+Bevor ihr ein 1M-Steps-Training (~3h) anstoßt, fahrt einen 10k-Step-Mini-Run, um sicherzugehen dass:
+- W&B-Login klappt und der Run im richtigen Workspace landet
+- Modell-Save am Ende durchläuft (nicht erst nach 3h sehen, dass `models/`-Pfad falsch war)
+- Browser stabil im Vordergrund bleibt
+
+Dafür eigene Config nehmen / `total_timesteps: 10_000` temporär in `configs/ppo_default.yaml` setzen, oder `qwop-gym train_ppo` (Default 100k) als Ersatz nutzen.
+
+### Während das Training läuft
+
+- **Browser nicht überdecken** — bei Bedarf zweiten Monitor nutzen oder das Fenster auf einen freien Screenbereich ziehen
+- **Bildschirm nicht sperren / schlafen lassen** — drosselt ebenfalls (`caffeinate -d &` hilft, mit `pkill caffeinate` wieder ausschalten)
+- **W&B live mitlesen** auf [wandb.ai/qwop-rl/qwop-rl-dhbw](https://wandb.ai/qwop-rl/qwop-rl-dhbw) oder lokal `tensorboard --logdir logs/`
+- **Trainings-Browser nie schließen** — nur via Skript-Ende oder `pkill` (siehe Stolperstein 8)
+
+### Nach dem Training
+
+- Modell liegt in `models/<run-name>/final.zip` (für `scripts/train.py`) bzw. `data/PPO-<id>/model.zip` (für `qwop-gym train_ppo`)
+- Wenn der Run einen Best-of-Group setzt: in W&B-UI `tag:best` setzen + Artifact als „Production"/„Latest" aliasen (siehe `docs/wandb-setup.md`)
+- Verwaiste Chrome-Prozesse putzen, falls was hängt:
+  ```bash
+  pkill -f "user-agent=Chrome-"
+  pkill -f chromedriver
+  ```
+
 ## Architektur — wichtig
 
-Die QWOP-Anbindung läuft über [`smanolloff/qwop-gym`](https://github.com/smanolloff/qwop-gym) (Browser/Chrome via ChromeDriver, optimiert auf 1900+ Steps/s). Smoke-Test 2026-06-02 hat das validiert; Details + Optionen-Vergleich stehen in [`docs/architecture.md`](docs/architecture.md). Größere Architektur-Wechsel (z.B. Migration auf eigenen Box2D-Port) gehören als ADR in `docs/adr/`.
+Die QWOP-Anbindung läuft über [`smanolloff/qwop-gym`](https://github.com/smanolloff/qwop-gym) (Browser/Chrome via ChromeDriver, optimiert auf 1900+ Steps/s). **Diese Entscheidung steht** — Smoke-Test 2026-06-02 hat sie validiert, qwop-gym ist seit Commit `f74b193` als Dependency gesetzt und in `src/qwop_rl/envs/__init__.py` eingebunden. Details + Optionen-Vergleich stehen in [`docs/architecture.md`](docs/architecture.md). Ein eigenes ADR-0001 ist dafür **nicht mehr nötig** — die Entscheidung ist über Smoke-Test, Architektur-Doku und Code dokumentiert; ADRs sparen wir uns für echte offene Trade-offs (z.B. wenn wir mal weg von Browser auf Box2D-Port migrieren wollen).
 
 ### Recherche-Stand (2026-06-02)
 
@@ -93,7 +215,42 @@ Andere geprüfte Projekte (alle weniger geeignet):
 - `Kirkados/QWOP` — Box2D-Reimplementation, aber TF 1.15 (uralt), keine Lizenz
 - 6 weitere (siehe Recherche-Notes) — alle entweder JS-only, tot, oder schlechter dokumentiert
 
-**Empfehlungs-Tendenz:** qwop-gym als Basis nehmen, eigener wissenschaftlicher Beitrag in Reward-Engineering / Algorithmen-Vergleich / Hyperparameter-Studie / Imitation-Learning. Endgültige Entscheidung folgt in **ADR-0001** nach Smoke-Test-Abschluss.
+**Empfehlungs-Tendenz:** qwop-gym als Basis nehmen, eigener wissenschaftlicher Beitrag in Reward-Engineering / Algorithmen-Vergleich / Hyperparameter-Studie / Imitation-Learning. **Stand 2026-06-08 entschieden:** qwop-gym ist gesetzt (Code in `src/qwop_rl/envs/`, Dependency in `requirements.txt`). Welche der Forschungsrichtungen das Studienprojekt-Thema wird, ist noch offen — wird im Team festgelegt, kein ADR nötig.
+
+## Repo-Stand (Stand 2026-06-11)
+
+Damit Claude (und alle anderen) sich nicht erst durch alle Files lesen müssen — was steht, was fehlt:
+
+### Steht ✅
+
+- **Setup & Doku:** `README.md`, `SETUP.md` (Win + macOS), `docs/onboarding.md`, `docs/concepts.md`, `docs/architecture.md`, `docs/wandb-setup.md`, `docs/CONTRIBUTING.md`. ADR-Template (`docs/adr/0000-template.md`) liegt für Bedarfsfall bereit, **keine ADRs geschrieben**.
+- **Build:** `pyproject.toml` (Python 3.11 fixiert via `requires-python = ">=3.11,<3.12"`), `requirements.txt`, `requirements-dev.txt`, Ruff/MyPy/Pytest konfiguriert, Pre-Commit-Hooks.
+- **Package-Skelett:** `src/qwop_rl/{envs,agents,utils}/__init__.py` mit Version 0.1.0. `agents/` und `utils/` sind nur Stubs (Docstring-only).
+- **Env-Anbindung:** `src/qwop_rl/envs/__init__.py` liefert `make_env()`, das `config/env.yml` einliest und Defaults mit User-Kwargs merged. Behebt Stolperstein 10.
+- **Trainings-Skript:** `scripts/train.py` — vollständig, lädt YAML-Config, baut `DummyVecEnv`, startet SB3-PPO, loggt zu W&B (mit `WandbCallback` + `sync_tensorboard`), speichert Modell nach `models/<run-name>/final.zip`. Unterstützt `--run-name`, `--tags`, `--no-wandb`.
+- **Default-Config:** `configs/ppo_default.yaml` — 1M Timesteps, 4 parallele Envs, PPO-Default-Hyperparameter, Seed 42. Achtung: `env.id` steht dort noch auf `QwopEnv-v0` — Kommentar im File sagt „placeholder". Vor dem ersten echten Lauf auf `QWOP-v1` umstellen (oder `make_env` setzt sowieso den Default — siehe `envs/__init__.py:25`).
+- **Tests:** `tests/test_smoke.py` (Package importierbar, Version gesetzt) und `tests/envs/test_make_env.py` (Dummy-Env, prüft kwargs-Forwarding ohne Chrome).
+- **W&B:** Workspace `wandb.ai/qwop-rl/qwop-rl-dhbw` existiert, `.env` lokal mit Key gefüllt, `.env.example` als Vorlage. Connection-Test in CLAUDE.md dokumentiert.
+- **Lokales qwop-gym-Setup auf Maintainer-Maschine:** ChromeDriver 148 als Symlink auf `~/qwop-gym-test/bin/chromedriver`, `config/env.yml` per `qwop-gym bootstrap` erzeugt, `QWOP.min.js` in `.venv` gepatcht. Smoke-Test 2026-06-02: Benchmark 1920 Steps/s, 10k PPO-Steps in 22.92 s. Repo am 2026-06-08 von `~/Documents/...` nach `~/dev/QWOP/` umgezogen (iCloud-TCC, Stolperstein 13).
+- **Branch:** `feat/qwop-gym-integration` ist clean — qwop-gym-Integration committed (`f74b193`), `make_env`/Test-Updates (`477ffb8`), Doku-Updates (`7f0fbf6`, `c274ffc`, `6655dde`).
+
+### Steht NICHT (offene Punkte)
+
+- **`agents/`-Modul:** kein eigener Agent-Wrapper geschrieben — `scripts/train.py` instantiiert SB3-PPO direkt. Wenn wir einen Layer drumherum wollen (Checkpoints, Eval-Runs, Video-Recording — siehe `docs/architecture.md`), liegt das hier.
+- **`utils/`-Modul:** leer (nur Docstring). Config-Loader und Logging-Helper sind aktuell inline in `train.py`.
+- **`scripts/eval.py`/`scripts/play.py`:** in `docs/architecture.md` als geplant erwähnt, **nicht vorhanden**.
+- **Erstes Mini-Training mit `scripts/train.py` + W&B-Roundtrip:** noch nicht gefahren. Bevor jemand 1M Steps (~3h) startet → 10k-Step-Smoke fahren (siehe Run-Anleitung weiter oben).
+- **`configs/ppo_default.yaml` hat `env.id: QwopEnv-v0`** (Platzhalter aus der Setup-Phase). Funktioniert in der Praxis, weil `make_env` ohne expliziten `id`-Key auf `QWOP-v1` defaultet — aber der String im YAML ist irreführend. Beim ersten echten Lauf glattziehen.
+- **Forschungsfrage:** noch nicht entschieden (siehe oben).
+- **PR / Merge nach `main`:** Branch `feat/qwop-gym-integration` ist reif, aber nicht gemerged.
+- **CI:** `.github/` existiert, Inhalt nicht in dieser Sektion dokumentiert — vor Merge prüfen, ob die Workflows durchlaufen.
+
+### Logische nächste Schritte
+
+1. **10k-Step-Mini-Smoke mit `scripts/train.py`** — verifiziert die ganze W&B-Pipeline end-to-end. Vorher `total_timesteps` in `configs/ppo_default.yaml` temporär auf 10_000 setzen oder eine eigene `configs/ppo_smoke.yaml` anlegen. **Muss der User selbst starten** (Stolperstein 12).
+2. **`feat/qwop-gym-integration` als PR rausschicken**, sobald Mini-Smoke grün.
+3. **Forschungsfrage festlegen** (Reward-Engineering / Algo-Vergleich / Imitation-Learning / …) — bestimmt, welche Configs/Skripte als nächstes kommen.
+
 
 ## Projektstruktur
 
@@ -131,7 +288,7 @@ docs/          # Architektur + ADRs + Onboarding
   ```
   feat(envs): QWOP-Browser-Wrapper hinzugefügt
   fix(agents): Reward-Normalisierung korrigiert
-  docs(adr): ADR-0001 Browser-Anbindung
+  docs(architecture): Anbindungs-Optionen ergänzt
   ```
 - **PRs:** Mindestens ein Review vor Merge. Squash-Merge auf `main`.
 - Niemals direkt auf `main` pushen.
@@ -151,7 +308,7 @@ Modelle und Trainings-Metriken **gehören nicht ins Git-Repo**, sondern in W&B. 
 ## Workflows für Claude
 
 - **Vor größeren Änderungen** zuerst Plan vorschlagen / EnterPlanMode nutzen.
-- **Architektur-Entscheidungen** als ADR in `docs/adr/` festhalten (siehe `docs/adr/0000-template.md`).
+- **Architektur-Entscheidungen** nur dann als ADR in `docs/adr/` festhalten, wenn echte Trade-offs unklar bleiben (Template: `docs/adr/0000-template.md`). Für Entscheidungen, die der Smoke-Test oder ein Commit-Body ohnehin schon sauber dokumentiert, kein ADR — siehe „Antitest" weiter unten.
 - **Keine echten Trainings starten**, ohne dass das vorher abgestimmt wurde — GPU-Zeit ist begrenzt.
 - **Modelle / Logs / Daten** nicht committen (siehe `.gitignore`).
 - **Secrets** (W&B-Keys etc.) nur in `.env`, niemals ins Repo.
@@ -260,7 +417,7 @@ Falls ihr `smanolloff/qwop-gym` lokal aufsetzt — folgendes vorab beachten:
    pkill -f chromedriver
    ```
 
-9. **`qwop-gym` läuft erst mit ChromeDriver-Setup.** Die Library ist seit ADR-Klärung in `requirements.txt`, aber der Browser-/Driver-Pfad muss lokal gemacht werden (siehe `SETUP.md` Schritt 5–6). Auf Maschinen ohne Chrome (z.B. CI für reine Lint/Test-Jobs) reicht `pytest` über die jetzigen Tests — die spannen kein Chrome auf.
+9. **`qwop-gym` läuft erst mit ChromeDriver-Setup.** Die Library ist in `requirements.txt`, aber der Browser-/Driver-Pfad muss lokal gemacht werden (siehe `SETUP.md` Schritt 5–6). Auf Maschinen ohne Chrome (z.B. CI für reine Lint/Test-Jobs) reicht `pytest` über die jetzigen Tests — die spannen kein Chrome auf.
 
 10. **`gym.make("QWOP-v1")` braucht Konstruktor-Argumente, nicht nur `config/env.yml`.** Die qwop-gym-CLI (`qwop-gym train_ppo` etc.) liest `config/env.yml` automatisch — `gym.make()` aber **nicht**. Wer das Env aus eigenem Python aufruft, muss die Pfade selber durchreichen, sonst kommt:
     ```
@@ -278,6 +435,24 @@ Falls ihr `smanolloff/qwop-gym` lokal aufsetzt — folgendes vorab beachten:
 12. **Browser-Vordergrund-Drosselung — Trainings aus Claude heraus funktionieren nicht.** macOS drosselt Chrome-Fenster, sobald sie überdeckt sind (Background-Throttling). `qwop-gym benchmark`/`train_ppo` hängen dann scheinbar — kein Output, Python-Prozess hat 0 % CPU, Frames pro Sekunde fallen auf ~0. Symptom: `ps -p <pid> -o time` zeigt seit Minuten dieselbe CPU-Zeit. Lösung: das kleine 660×585-Browserfenster (Position 650,130) muss vorne sein.
 
     **Konsequenz für Claude:** echte qwop-gym-Trainings/Benchmarks NICHT direkt aus dem Tool aufrufen — das Terminal überdeckt zwangsläufig den Browser. Stattdessen dem User ein konkretes Kommando in die Hand geben („führe in einem eigenen Terminal aus, klick danach das Browserfenster vorne") und ihn das selbst starten lassen. Code-Validierung (Env spawnt sauber, schließt sauber, observation/action-Spaces stimmen) geht aber problemlos — ein einzelner `make_env() + close()` braucht den Browser-Vordergrund nicht.
+
+13. **macOS-Datenschutz: `~/Documents` blockiert Chromes file://-Zugriff — auch mit Full Disk Access.** Wenn das Repo unter `~/Documents/...` liegt (z.B. weil's ein DHBW-Studienprojekt ist), öffnet Chrome die `QWOP.html` im venv per `file://` — und wird von macOS blockiert:
+    ```
+    Access to the file was denied
+    file:///Users/.../QWOP/.venv/lib/python3.11/site-packages/qwop_gym/envs/v1/game/QWOP.html?...
+    ERR_ACCESS_DENIED
+    ```
+    Symptom: Chrome-Fenster geht auf, zeigt das obige Sad-Face, qwop-gym hängt bei `Loading configuration from config/benchmark.yml`. Auf der alten Smoke-Test-Maschine `~/qwop-gym-test/` trat das nicht auf, weil `~/qwop-gym-test/` nicht TCC-geschützt ist — `~/Documents/` ist's.
+
+    **Wichtig:** Das **„Full Disk Access"-Toggle in System Settings reicht NICHT**. macOS 26 (und neuer) hat für iCloud-managed Documents eine **separate** TCC-Schutzschicht. Diagnose: führe `ls -la@e ~/Documents | head` aus — wenn da `com.apple.file-provider-domain-id` als xattr steht, ist dein Documents-Ordner iCloud-managed und FDA hilft nicht.
+
+    Wir haben das am 2026-06-08 in einer 12-Agenten-Workflow-Diagnose verifiziert: alle anderen Hypothesen (URL-Encoding, Incognito-Mode, ChromeDriver-Mismatch, Quarantäne-xattrs) wurden ausgeschlossen — übrig blieb iCloud-Documents-TCC.
+
+    **Robuster Fix:** Repo aus `~/Documents/` rausziehen (z.B. `~/dev/QWOP/`). venv muss neu gebaut werden (venv-Pfade sind absolut), `config/env.yml` muss neue Driver-Pfade kriegen. Versuch zuerst trotzdem: Privacy & Security → **„Files and Folders"** (NICHT „Full Disk Access") → Chrome → Documents-Ordner aktivieren — manchmal reicht das, oft nicht.
+
+    **2026-06-08, verifiziert:** Genau dieses Problem hatten wir auf der Maintainer-Maschine. Full Disk Access war für Chrome aktiviert — `qwop-gym benchmark` lief trotzdem in `ERR_ACCESS_DENIED`. Nach Umzug von `~/Documents/DHBW/Neue Konzepte 2/QWOP/` nach `~/dev/QWOP/` (`mv`, neue venv, `qwop-gym bootstrap`/`patch` neu) lief `make_env() + reset()` sofort sauber durch. Hypothese bestätigt.
+
+    Auf Windows ist das Pendant der OneDrive-Pfad — siehe SETUP.md, Schritt 2.
 
 ### Allgemein
 
