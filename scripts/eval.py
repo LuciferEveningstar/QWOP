@@ -34,6 +34,15 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Pick the argmax action instead of sampling. Cleaner playback.",
     )
+    parser.add_argument(
+        "--render-every",
+        type=int,
+        default=4,
+        help=(
+            "Render every Nth step (default: 4 → ~15 Hz). Lower = smoother but"
+            " slower; higher = faster but choppier. Set to 0 to disable rendering."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -47,7 +56,18 @@ def main() -> int:
 
     from qwop_rl.envs import make_env
 
-    env = make_env({"id": "QWOP-v1"})
+    # Show the game in the browser. auto_draw=False (default) means we have to
+    # call env.render() ourselves — doing it every Nth step lets us trade
+    # smoothness against speed.
+    env = make_env(
+        {
+            "id": "QWOP-v1",
+            "kwargs": {
+                "game_in_browser": True,
+                "stat_in_browser": True,
+            },
+        }
+    )
     model = PPO.load(args.model, env=env)
 
     for ep in range(1, args.episodes + 1):
@@ -60,6 +80,8 @@ def main() -> int:
             obs, reward, terminated, truncated, _info = env.step(action)
             total_reward += float(reward)
             steps += 1
+            if args.render_every and steps % args.render_every == 0:
+                env.render()
         print(f"[eval] Episode {ep}: reward={total_reward:.2f}, steps={steps}")
 
     env.close()
