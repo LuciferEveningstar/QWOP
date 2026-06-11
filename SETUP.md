@@ -353,36 +353,39 @@ Wenn das funktioniert: alle Komponenten reden miteinander. Glückwunsch.
 
 ## 9. Erstes Mini-Training
 
-Jetzt der erste richtige RL-Lauf — klein gehalten als Smoke-Test:
+Jetzt der erste richtige RL-Lauf — bewusst klein gehalten, um die ganze Pipeline (Env → SB3 → W&B → Modell-Save) end-to-end zu prüfen, bevor jemand stundenlang trainiert. Wir nutzen die mitgelieferte Smoke-Config:
 
 ```bash
-# Kurzes Mini-Training mit qwop-gym's eingebautem PPO
-qwop-gym train_ppo
+python scripts/train.py --config configs/ppo_smoke.yaml --tags smoke
 ```
 
-Default-Config trainiert 100.000 Steps. Auf einem 7800X3D dauert das **~3 Minuten**. Auf einem M2 ~3–4 Minuten.
-
-> **Hinweis:** Während des Trainings öffnet sich ein Chrome-Fenster und darf **nicht** in den Hintergrund. Das OS drosselt sonst den Browser. Großen Bildschirm? Lass das Fenster sichtbar daneben liegen.
+10.000 Steps, 1 Env, ~30 s. Während es läuft öffnet sich ein Chrome-Fenster — **darf nicht in den Hintergrund** (sonst drosselt das OS).
 
 Erwartete Ausgabe am Ende:
 
 ```
-duration: ~22-180 Sekunden (je nach Hardware)
-out_dir: data/PPO-<run-id>
+[train] Model saved to models/<run-name>/final.zip
+wandb: 🚀 View run <name> at: https://wandb.ai/qwop-rl/qwop-rl-dhbw/runs/<id>
 ```
 
-Im `data/`-Ordner liegt jetzt eine `model.zip` — das ist dein erster Agent. Spielt zwar wie ein Baby, aber er existiert.
+Im W&B-Browser solltest du sehen:
+- Run mit Tag `smoke`
+- Lernkurven (Reward, Loss, fps)
+- Hyperparameter unter „Config"
+- Modell als Artifact unter „Files"
 
-### Diesen Lauf in W&B sehen
+Wenn das geht, hast du die komplette Pipeline verifiziert. Glückwunsch.
 
-`qwop-gym train_ppo` loggt **nicht** automatisch zu W&B. Dafür gibt es eine eigene Config:
+### Alternative: qwop-gym-CLI (ohne unseren `train.py`)
+
+`qwop-gym` bringt einen eigenen Trainer mit, der unabhängig von unserem `scripts/train.py` läuft — gut zum Vergleich oder wenn `train.py` aus irgendeinem Grund streikt:
 
 ```bash
-# Mit W&B-Logging
-qwop-gym -c config/wandb/ppo.yml train_ppo
+qwop-gym train_ppo                                # 100k Steps, lokal, kein W&B
+qwop-gym -c config/wandb/ppo.yml train_ppo        # mit W&B
 ```
 
-Beim ersten Mal fragt W&B einmalig nach Login (oder zieht den API-Key aus deiner `.env`, wenn du `wandb login` einmal machst). Danach: Live-Charts auf [wandb.ai/qwop-rl/qwop-rl-dhbw](https://wandb.ai/qwop-rl/qwop-rl-dhbw).
+Modelle landen in `data/PPO-<run-id>/model.zip`.
 
 ---
 
@@ -435,6 +438,6 @@ Wenn alles aus den Schritten 1–9 funktioniert hat, hast du die Setup-Phase abg
 - **[`docs/wandb-setup.md`](wandb-setup.md)** — Konventionen für eure W&B-Runs (Naming, Tags, Modell-Sharing)
 - **[`docs/CONTRIBUTING.md`](CONTRIBUTING.md)** — Branch- und PR-Workflow
 
-**Erster echter Trainingslauf:** Editiere `config/train_ppo.yml` und setze `total_timesteps: 5_000_000` (statt 100.000). Das läuft auf einem 7800X3D ~2–3h. Über Mittag oder über Nacht starten.
+**Erster echter Trainingslauf:** Eigene Config in `configs/ppo_<variante>.yaml` anlegen (oder `configs/ppo_default.yaml` als Vorlage kopieren), `total_timesteps` auf z.B. `5_000_000` setzen, dann `python scripts/train.py --config configs/ppo_<variante>.yaml --run-name <initialen>-<datum>-<beschreibung> --tags experiment`. Auf einem 7800X3D ~2–3 h. Über Mittag oder über Nacht starten.
 
 Bei Problemen, die nicht in Kapitel 10 stehen, frag im Team-Channel oder hänge eine Issue an [GitHub](https://github.com/LuciferEveningstar/QWOP/issues) ran.

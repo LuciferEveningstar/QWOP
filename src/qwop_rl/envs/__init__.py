@@ -21,6 +21,7 @@ import gymnasium as gym
 # so any caller of make_env() sees the registration; the import is cheap.
 import qwop_gym  # noqa: F401
 import yaml
+from stable_baselines3.common.monitor import Monitor
 
 DEFAULT_ENV_ID = "QWOP-v1"
 DEFAULT_QWOP_GYM_CONFIG = Path("config/env.yml")
@@ -41,6 +42,9 @@ def _load_qwop_gym_kwargs(path: Path = DEFAULT_QWOP_GYM_CONFIG) -> dict[str, Any
 
 def make_env(config: dict[str, Any] | None = None) -> gym.Env:
     """Build a QWOP Gymnasium environment from a config dict.
+
+    The returned env is wrapped in :class:`stable_baselines3.common.monitor.Monitor`
+    so SB3 logs ``rollout/ep_rew_mean`` and ``rollout/ep_len_mean`` automatically.
 
     Parameters
     ----------
@@ -69,4 +73,5 @@ def make_env(config: dict[str, Any] | None = None) -> gym.Env:
     else:
         kwargs = dict(user_kwargs)
 
-    return gym.make(env_id, **kwargs)
+    env = gym.make(env_id, **kwargs)
+    return Monitor(env)

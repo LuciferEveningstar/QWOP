@@ -1,0 +1,29 @@
+# Mini-Smoke-Config — verifiziert die Pipeline end-to-end (~30s auf M-Series).
+# NICHT für echte Trainings, nur als Reality-Check vor langen Läufen.
+algorithm: PPO
+
+env:
+  id: QWOP-v1
+  kwargs: {}
+
+ppo:
+  policy: MlpPolicy
+  learning_rate: 3.0e-4
+  n_steps: 2048
+  batch_size: 64
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.0
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+
+training:
+  total_timesteps: 10_000
+  seed: 42
+  n_envs: 1                 # nur 1 Env für den Smoke — schneller Setup, leichter zu debuggen
+
+paths:
+  log_dir: logs/ppo_smoke
+  model_dir: models/ppo_smoke

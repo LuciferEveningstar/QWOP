@@ -1,0 +1,38 @@
+# Reward-Variation 1: failure_cost auf 0 — soll Standing-Strategy aufbrechen.
+#
+# Hypothese: Im Baseline-Run (pl-2026-06-11-test500k) hat der Agent gelernt,
+# dass Stillstehen besser ist als Stürzen (failure_cost=10 ist viel höher als
+# der schwache time_cost). Mit failure_cost=0 sollte er trauen zu fallen und
+# dadurch echtes Laufen lernen.
+#
+# Vergleich: Reward-Kurven, Steps-bis-Sturz, Eval-Verhalten.
+algorithm: PPO
+
+env:
+  id: QWOP-v1
+  kwargs:
+    failure_cost: 0          # Default: 10
+    # success_reward: 50    # Default belassen
+    # time_cost_mult: 10    # Default belassen
+
+ppo:
+  policy: MlpPolicy
+  learning_rate: 3.0e-4
+  n_steps: 2048
+  batch_size: 64
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.0
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+
+training:
+  total_timesteps: 500_000
+  seed: 42                  # selber Seed wie Baseline für direkte Vergleichbarkeit
+  n_envs: 1
+
+paths:
+  log_dir: logs/ppo_failure0
+  model_dir: models/ppo_failure0
