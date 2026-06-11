@@ -22,7 +22,7 @@ Studienprojekt "Neue Konzepte 2" (DHBW).
 
 ## Architektur — kurz
 
-Die QWOP-Anbindung läuft über [`smanolloff/qwop-gym`](https://github.com/smanolloff/qwop-gym) (Browser/Chrome via ChromeDriver, optimiert auf 1900+ Steps/s). qwop-gym ist als Dependency in `requirements.txt` gesetzt und in `src/qwop_rl/envs/__init__.py` über `make_env()` eingebunden, die `config/env.yml` einliest und Defaults mit User-Kwargs merged.
+Die QWOP-Anbindung läuft über [`smanolloff/qwop-gym`](https://github.com/smanolloff/qwop-gym) (Browser/Chrome via ChromeDriver, optimiert auf 1900+ Steps/s). qwop-gym ist als Dependency in `requirements.txt` gesetzt und in `src/qwop_rl/envs/__init__.py` über `make_env()` eingebunden, die `config/env.yml` einliest, Defaults mit User-Kwargs merged und das Env mit SB3s `Monitor`-Wrapper umhüllt — letzteres sorgt dafür, dass `rollout/ep_rew_mean` und `rollout/ep_len_mean` automatisch in W&B/TensorBoard auftauchen.
 
 Details, Optionen-Vergleich und Recherche-Stand stehen in [`docs/architecture.md`](docs/architecture.md). Größere Architektur-Wechsel (z.B. Migration auf eigenen Box2D-Port) gehören als ADR in `docs/adr/` — für die initiale qwop-gym-Wahl reicht `architecture.md`.
 
@@ -103,13 +103,34 @@ Erst wenn der grün ist, lange Läufe (1M+ Steps, mehrere Stunden) starten.
 
 ### Nach dem Training
 
-- Modell liegt in `models/<run-name>/final.zip` (für `scripts/train.py`) bzw. `data/PPO-<id>/model.zip` (für `qwop-gym train_ppo`)
+- Modell liegt in `models/<model_dir-aus-yaml>/final.zip` (für `scripts/train.py`) bzw. `data/PPO-<id>/model.zip` (für `qwop-gym train_ppo`). **Achtung:** der Pfad kommt aus `paths.model_dir` im YAML, NICHT aus `--run-name` — der Run-Name geht nur an W&B.
 - Wenn der Run einen Best-of-Group setzt: in W&B-UI `tag:best` setzen + Artifact als „Production"/„Latest" aliasen (siehe `docs/wandb-setup.md`)
 - Verwaiste Chrome-Prozesse putzen, falls was hängt:
   ```bash
   pkill -f "user-agent=Chrome-"
   pkill -f chromedriver
   ```
+
+### Modell anschauen (Eval)
+
+`scripts/eval.py` lädt ein gespeichertes SB3-Modell und spielt N Episoden visuell im Browser ab. Zwingt qwop-gym dabei in den sichtbaren Modus (`game_in_browser=True`, `stat_in_browser=True`), egal was `config/env.yml` sagt — Trainings-Configs haben Rendering aus, im Eval willst du es an.
+
+```bash
+# Standard: 5 Episoden mit Sampling, Frame alle 4 Steps (smooth genug, brauchbar schnell)
+python scripts/eval.py --model models/<model_dir>/final.zip --episodes 5
+
+# Deterministisch: Policy nimmt immer argmax-Aktion → reproduzierbar gleiche Trajektorie.
+# Gut zum Vergleichen verschiedener Modelle, aber zeigt nur den "Modus" der Policy.
+python scripts/eval.py --model models/<model_dir>/final.zip --episodes 5 --deterministic
+
+# Render-Frequenz justieren — kleiner = smoother, größer = schneller, 0 = kein Rendering
+python scripts/eval.py --model models/<model_dir>/final.zip --episodes 5 --render-every 2
+python scripts/eval.py --model models/<model_dir>/final.zip --episodes 20 --render-every 0  # nur Stats
+```
+
+**Diagnostik aus den Eval-Outputs:** pro Episode kommt `reward=<float>, steps=<int>` — qwop-gyms Reward ist `Δdistanz - time_cost` mit `failure_cost`/`success_reward` als Boni. Reward > ~100 bei steps > 5000 = 100m-Erfolg, Reward stark negativ + steps < 500 = früher Sturz, alles dazwischen = Teilstrecke + Sturz oder Timeout.
+
+`--deterministic` und Sampling können sehr unterschiedliche Resultate liefern — wenn die Policy hohe Entropy hat (z.B. `entropy_loss > -2.0` am Trainingsende), exploriert die Sampling-Variante deutlich mehr Strategien als der argmax-Modus. Beide Modi liefern zusammen ein viel besseres Bild als einer allein.
 
 ## Projektstruktur
 
@@ -210,6 +231,11 @@ python scripts/train.py --config configs/ppo_smoke.yaml --tags smoke      # 10k 
 python scripts/train.py --config configs/ppo_default.yaml                 # 1M Steps, ~2-3h
 python scripts/train.py --config configs/ppo_default.yaml --no-wandb      # Quick-Debug ohne Tracking
 
+# Modell anschauen (Browser-Fenster vorne!)
+python scripts/eval.py --model models/<model_dir>/final.zip --episodes 5
+python scripts/eval.py --model models/<model_dir>/final.zip --episodes 5 --deterministic
+python scripts/eval.py --model models/<model_dir>/final.zip --episodes 20 --render-every 0  # nur Stats
+
 # Lokale Lernkurven
 tensorboard --logdir logs/
 # (oder live im Browser auf wandb.ai)
@@ -277,6 +303,13 @@ Diese Liste ist die Sammelstelle für alles, worüber wir oder andere QWOP-RL-Pr
     **Robuster Fix:** Repo aus `~/Documents/` rausziehen (z.B. `~/dev/QWOP/`). venv muss neu gebaut werden (Pfade absolut), `config/env.yml` muss neue Driver-Pfade kriegen. Versuch zuerst trotzdem: Privacy & Security → **„Files and Folders"** (NICHT „Full Disk Access") → Chrome → Documents-Ordner aktivieren — manchmal reicht das, oft nicht.
 
     Auf Windows ist das Pendant der OneDrive-Pfad — siehe SETUP.md, Schritt 2.
+
+14. **Eval-Browser zeigt Standbild trotz `game_in_browser: True`.** qwop-gyms `config/env.yml` hat per Default `auto_draw: false` — das Spiel rendert im Browser nicht automatisch, sondern nur bei explizitem `env.render()`-Call. Heißt: ohne Render-Call siehst du nur das Reset-Frame. Mit `auto_draw: true` rendert qwop-gym jeden Step → starkes Stuttering und langsamer Eval. Bessere Lösung: in unserem `scripts/eval.py` ist `auto_draw` aus, dafür wird alle N Steps explizit `env.render()` aufgerufen (`--render-every`, Default 4). Smoothness vs. Speed über die Flag justieren.
+
+15. **`--run-name` ≠ Modell-Pfad.** `scripts/train.py --run-name foo` setzt nur den **W&B-Run-Namen**. Der **lokale Modell-Pfad** kommt aus `paths.model_dir` im YAML. Wenn dein YAML `model_dir: models/ppo_test500k` sagt, landet das Modell in `models/ppo_test500k/final.zip` — egal welcher `--run-name`. Beim Eval also nicht den W&B-Namen tippen, sondern nachschauen wo das `final.zip` real liegt:
+    ```bash
+    find models -name "final.zip" -mmin -60   # zuletzt geschriebene Modelle
+    ```
 
 ### Allgemein
 
