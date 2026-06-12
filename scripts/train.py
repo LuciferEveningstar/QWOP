@@ -141,14 +141,26 @@ def main() -> int:
         **ppo_cfg,
     )
 
-    callback = None
+    from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback
+
+    checkpoint_freq = int(training_cfg.get("checkpoint_freq", 50_000))
+    checkpoint_callback = CheckpointCallback(
+        save_freq=checkpoint_freq,
+        save_path=str(model_dir / "checkpoints"),
+        name_prefix="model",
+        verbose=1,
+    )
+    callbacks = [checkpoint_callback]
+
     if use_wandb and wandb_run is not None:
         from wandb.integration.sb3 import WandbCallback
 
-        callback = WandbCallback(
+        callbacks.append(WandbCallback(
             model_save_path=str(model_dir),
             verbose=2,
-        )
+        ))
+
+    callback = CallbackList(callbacks)
 
     total_timesteps = int(training_cfg.get("total_timesteps", 100_000))
     print(f"[train] Starting PPO for {total_timesteps:,} timesteps (n_envs={n_envs}).")
