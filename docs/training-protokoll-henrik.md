@@ -12,7 +12,7 @@ Dieses Dokument protokolliert alle Trainingsläufe von Henrik, die genutzten Kon
 | a-2026-06-11-164747 | [ppo_default.yaml](../configs/ppo_default.yaml) | 1.000.000 | +41.2 | — | [Link](https://wandb.ai/qwop-rl/qwop-rl-dhbw/runs/dpsde1my) |
 | a-2026-06-12-113046 | [ppo_ent001.yaml](../configs/ppo_ent001.yaml) | 3.000.000 | +105 @ 1.6M | — | [Link](https://wandb.ai/qwop-rl/qwop-rl-dhbw/runs/4s0cxii6) |
 | a-2026-06-13 (Run 4) | [ppo_ent001_finetune.yaml](../configs/ppo_ent001_finetune.yaml) | 10.000.000 | +168 @ 8.65M | 75% | [Link](https://wandb.ai/qwop-rl/qwop-rl-dhbw/runs/mk6f4gw4) |
-| a-2026-06-13 (Run 5) | [ppo_run5.yaml](../configs/ppo_run5.yaml) | 3.000.000 | +177 @ 1.75M | **94%** | [Link](https://wandb.ai/qwop-rl/qwop-rl-dhbw/runs/a-2026-06-13-203134) |
+| a-2026-06-13 (Run 5) | [ppo_run5.yaml](../configs/ppo_run5.yaml) | 3.000.000 | +184 @ 2.75M | **94%** | [Link](https://wandb.ai/qwop-rl/qwop-rl-dhbw/runs/a-2026-06-13-203134) |
 
 ---
 
@@ -315,21 +315,21 @@ Stabilere Updates durch mehr gesammelte Erfahrung reduzieren Catastrophic Forget
 
 ### Checkpoint-Evaluation (2026-06-15)
 
-Manuelle Evaluation mehrerer Checkpoints mit je 50 Episoden via `eval.py --render-every 0`:
+Manuelle Evaluation aller relevanten Checkpoints mit je 50 Episoden via `eval.py --render-every 0`:
 
 | Checkpoint | Mean | Median | Std | Erfolgsrate | Fazit |
 |---|---|---|---|---|---|
-| **model_1750000** | **177** | **166** | 49 | **94%** | **Bestes Modell** |
-| model_2000000 | 170 | 162 | 46 | 92% | Gut aber schlechter |
+| model_1750000 | 177 | 166 | 49 | 94% | Sehr gut |
+| model_2000000 | 170 | 162 | 46 | 92% | Gut |
+| model_2250000 | 162 | 165 | 52 | 86% | Schlechter |
+| **model_2750000** | **184** | **166** | **44** | **94%** | **Bestes Modell** |
 | final.zip (3M) | 161 | 163 | 40 | 90% | Konsistenteste Std |
 
-> Noch zu testen: model_2250000 und Peak am Ende (~2.5M-3M Steps) aus W&B-Graph
-
-**`model_1750000_steps.zip` ist bisher das beste Modell** — 94% Erfolgsrate, Mean +177.
+**`model_2750000_steps.zip` ist das beste Modell** — höchster Mean (+184), 94% Erfolgsrate, niedrigere Std als 1.75M.
 
 Gesichert als `models/ppo_run5/best.zip`:
 ```bash
-copy models\ppo_run5\checkpoints\model_1750000_steps.zip models\ppo_run5\best.zip
+copy models\ppo_run5\checkpoints\model_2750000_steps.zip models\ppo_run5\best.zip
 ```
 
 > **Hinweis:** `models\ppo_run5\` und `models\ppo_ent001_finetune\` sind komplett getrennte Ordner — Run 4 wird durch Run 5 nicht überschrieben.
@@ -361,7 +361,7 @@ Ursache: Das Modell wurde mit Sampling trainiert (`ent_coef: 0.01`). Im determin
 | Henrik (Run 2) | 1M | +41.2 | 2% | — | Baseline, `ent_coef: 0.0` |
 | Henrik (Run 3) | ~1.6M | +105 | 18% | — | Bester Checkpoint |
 | Henrik (Run 4) | ~8.65M | +168 | 44% | 75% | Fine-Tuning, lr=1e-4 |
-| **Henrik (Run 5)** | ~11.65M | +161 | ~35% | **90%** | **Bestes Modell**, n_steps=4096 |
+| **Henrik (Run 5)** | ~11.4M | +184 @ 2.75M | ~35% | **94%** | **Bestes Modell**, n_steps=4096 |
 | Niko | 5M | — | 9% | — | Bestes bei 5M |
 | Niko | 27.5M | +99 | 17% | — | Nach langem Training |
 | Niko | ~40M | +160 | 39% | — | Bisher bester Niko-Run |
