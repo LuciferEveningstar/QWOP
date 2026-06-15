@@ -12,7 +12,8 @@ Dieses Dokument protokolliert alle Trainingsläufe von Henrik, die genutzten Kon
 | a-2026-06-11-164747 | [ppo_default.yaml](../configs/ppo_default.yaml) | 1.000.000 | +41.2 | — | [Link](https://wandb.ai/qwop-rl/qwop-rl-dhbw/runs/dpsde1my) |
 | a-2026-06-12-113046 | [ppo_ent001.yaml](../configs/ppo_ent001.yaml) | 3.000.000 | +105 @ 1.6M | — | [Link](https://wandb.ai/qwop-rl/qwop-rl-dhbw/runs/4s0cxii6) |
 | a-2026-06-13 (Run 4) | [ppo_ent001_finetune.yaml](../configs/ppo_ent001_finetune.yaml) | 10.000.000 | +168 @ 8.65M | 75% | [Link](https://wandb.ai/qwop-rl/qwop-rl-dhbw/runs/mk6f4gw4) |
-| a-2026-06-13 (Run 5) | [ppo_run5.yaml](../configs/ppo_run5.yaml) | 3.000.000 | +184 @ 2.75M | **94%** | [Link](https://wandb.ai/qwop-rl/qwop-rl-dhbw/runs/a-2026-06-13-203134) |
+| a-2026-06-13 (Run 5) | [ppo_run5.yaml](../configs/ppo_run5.yaml) | 3.000.000 | +184 @ 2.75M | **94% ← Bestes Modell** | [Link](https://wandb.ai/qwop-rl/qwop-rl-dhbw/runs/a-2026-06-13-203134) |
+| a-2026-06-15 (Run 6) | [ppo_run6.yaml](../configs/ppo_run6.yaml) | 2.500.000 | +181 @ final | 92% | [Link](https://wandb.ai/qwop-rl/qwop-rl-dhbw/runs/1x191235) |
 
 ---
 
@@ -361,7 +362,8 @@ Ursache: Das Modell wurde mit Sampling trainiert (`ent_coef: 0.01`). Im determin
 | Henrik (Run 2) | 1M | +41.2 | 2% | — | Baseline, `ent_coef: 0.0` |
 | Henrik (Run 3) | ~1.6M | +105 | 18% | — | Bester Checkpoint |
 | Henrik (Run 4) | ~8.65M | +168 | 44% | 75% | Fine-Tuning, lr=1e-4 |
-| **Henrik (Run 5)** | ~11.4M | +184 @ 2.75M | ~35% | **94%** | **Bestes Modell**, n_steps=4096 |
+| **Henrik (Run 5)** | ~11.4M | +184 @ 2.75M | ~35% | **94% ← Bestes Modell** | n_steps=4096 |
+| Henrik (Run 6) | ~13.9M | +181 @ final | ~55% | 92% | lr=5e-5, n_steps=8192 |
 | Niko | 5M | — | 9% | — | Bestes bei 5M |
 | Niko | 27.5M | +99 | 17% | — | Nach langem Training |
 | Niko | ~40M | +160 | 39% | — | Bisher bester Niko-Run |
@@ -369,6 +371,34 @@ Ursache: Das Modell wurde mit Sampling trainiert (`ent_coef: 0.01`). Im determin
 **Wichtigste Erkenntnisse:**
 - `ent_coef: 0.01` + `lr: 1e-4` + `n_steps: 4096` + Fine-Tuning vom Checkpoint ist die beste Strategie
 - **W&B-Graph zeigt den Lernprozess, nicht die Modellqualität** — immer mit `eval.py --episodes 50` messen
-- Henrik erreicht **90% Erfolgsrate** (eval, 50 Episoden) — Nikos bester W&B-Wert ist 39% (nicht direkt vergleichbar)
-- **Catastrophic Forgetting** tritt bei beiden auf — Checkpoints und regelmäßige eval.py-Tests sind entscheidend
-- `deterministic=True` ist für dieses Modell kontraproduktiv — Sampling (`deterministic=False`) ist die richtige Eval-Methode
+- Henrik erreicht **94% Erfolgsrate** (stochastisch) und **100%** (deterministisch) — Nikos bester W&B-Wert ist 39%
+- **Catastrophic Forgetting** tritt bei allen Runs auf — Checkpoints und regelmäßige eval.py-Tests sind entscheidend
+- Run 6 (`lr=5e-5`, `n_steps=8192`) hat Run 5 nicht übertroffen — Run 5 bleibt das beste Modell
+
+---
+
+## Run 6 — kleinere LR + größere n_steps (2026-06-15)
+
+**Config:** [configs/ppo_run6.yaml](../configs/ppo_run6.yaml)
+**Start:** `models/ppo_run5/best.zip` (= model_2750000_steps.zip, 94% Erfolgsrate)
+**W&B:** https://wandb.ai/qwop-rl/qwop-rl-dhbw/runs/1x191235
+
+### Änderungen gegenüber Run 5
+| Parameter | Run 5 | Run 6 |
+|---|---|---|
+| learning_rate | 1e-4 | **5e-5** |
+| n_steps | 4096 | **8192** |
+| total_timesteps | 3.000.000 | **2.500.000** |
+
+### Checkpoint-Evaluation (50 Episoden je)
+| Checkpoint | Mean | Std | Erfolgsrate |
+|---|---|---|---|
+| model_2000000 | 176 | 63 | 86% |
+| model_2250000 | 179 | 57 | 92% |
+| model_2500000 | 175 | 56 | 90% |
+| final.zip (2.5M) | 181 | 49 | 92% |
+
+### Schlussfolgerung
+Run 6 hat Run 5 nicht übertroffen — maximale Erfolgsrate 92% vs. 94%. Die kleinere Learning Rate (`5e-5`) und größere `n_steps` (8192) brachten keine Verbesserung gegenüber Run 5.
+
+**Run 5 `model_2750000_steps.zip` bleibt das finale beste Modell** (94% stochastisch, 100% deterministisch, Mean +184).
