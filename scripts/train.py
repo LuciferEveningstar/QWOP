@@ -51,6 +51,12 @@ def parse_args() -> argparse.Namespace:
         help="W&B tags to attach to this run.",
     )
     parser.add_argument(
+        "--model",
+        type=Path,
+        default=None,
+        help="Checkpoint zum Weitermachen (optional). Z.B. models/ppo_ent001/best.zip",
+    )
+    parser.add_argument(
         "--no-wandb",
         action="store_true",
         help="Disable W&B logging entirely (useful for quick local debugging).",
@@ -132,23 +138,44 @@ def main() -> int:
 
     ppo_cfg = dict(config.get("ppo", {}))
     policy = ppo_cfg.pop("policy", "MlpPolicy")
-    model = PPO(
-        policy,
-        vec_env,
-        verbose=1,
-        tensorboard_log=str(log_dir),
-        seed=int(seed) if seed is not None else None,
-        **ppo_cfg,
-    )
+    if args.model is not None:
+        print(f"[train] Lade Checkpoint: {args.model}")
+        model = PPO.load(
+            args.model,
+            env=vec_env,
+            tensorboard_log=str(log_dir),
+            **ppo_cfg,
+        )
+    else:
+        model = PPO(
+            policy,
+            vec_env,
+            verbose=1,
+            tensorboard_log=str(log_dir),
+            seed=int(seed) if seed is not None else None,
+            **ppo_cfg,
+        )
 
-    callback = None
+    from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback
+
+    checkpoint_freq = int(training_cfg.get("checkpoint_freq", 50_000))
+    checkpoint_callback = CheckpointCallback(
+        save_freq=checkpoint_freq,
+        save_path=str(model_dir / "checkpoints"),
+        name_prefix="model",
+        verbose=1,
+    )
+    callbacks = [checkpoint_callback]
+
     if use_wandb and wandb_run is not None:
         from wandb.integration.sb3 import WandbCallback
 
-        callback = WandbCallback(
+        callbacks.append(WandbCallback(
             model_save_path=str(model_dir),
             verbose=2,
-        )
+        ))
+
+    callback = CallbackList(callbacks)
 
     total_timesteps = int(training_cfg.get("total_timesteps", 100_000))
     print(f"[train] Starting PPO for {total_timesteps:,} timesteps (n_envs={n_envs}).")
