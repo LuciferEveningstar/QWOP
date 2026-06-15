@@ -1,7 +1,8 @@
 """Lädt das beste Modell als W&B Artifact hoch.
 
 Usage:
-    python scripts/upload_model.py --model models/ppo_ent001_finetune/best.zip --name best-model-henrik
+    python scripts/upload_model.py --model models/ppo_run5/best.zip --name best-model-henrik
+    python scripts/upload_model.py --model models/ppo_run5/best.zip --name best-model-henrik --description "Run 5, model_2750000, 94% stochastisch, 100% deterministisch, Mean +184"
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", type=Path, required=True)
     parser.add_argument("--name", type=str, default="best-model-henrik")
+    parser.add_argument("--description", type=str, default="")
     return parser.parse_args()
 
 
@@ -28,12 +30,22 @@ def main() -> None:
         return
 
     import wandb
-    run = wandb.init(project="qwop-rl-dhbw", entity="qwop-rl", job_type="model-upload")
-    artifact = wandb.Artifact(args.name, type="model")
+    run = wandb.init(
+        project="qwop-rl-dhbw",
+        entity="qwop-rl",
+        job_type="model-upload",
+        notes=args.description,
+    )
+    artifact = wandb.Artifact(
+        args.name,
+        type="model",
+        description=args.description,
+    )
     artifact.add_file(str(args.model))
     run.log_artifact(artifact)
     run.finish()
     print(f"Hochgeladen: {args.name}")
+    print(f"W&B: https://wandb.ai/qwop-rl/qwop-rl-dhbw/artifacts/model/{args.name}")
 
 
 if __name__ == "__main__":
