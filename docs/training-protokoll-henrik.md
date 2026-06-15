@@ -6,11 +6,13 @@ Dieses Dokument protokolliert alle Trainingsläufe von Henrik, die genutzten Kon
 
 ## Übersicht Runs
 
-| Run | Config | Steps | ep_rew_mean | success_rate | W&B Link |
+| Run | Config | Steps | ep_rew_mean | success_rate (eval) | W&B Link |
 |---|---|---|---|---|---|
 | a-2026-06-11-163953 | [ppo_smoke.yaml](../configs/ppo_smoke.yaml) | 10.000 | — | — | [Link](https://wandb.ai/qwop-rl/qwop-rl-dhbw/runs/4eok5lam) |
-| a-2026-06-11-164747 | [ppo_default.yaml](../configs/ppo_default.yaml) | 1.000.000 | +41.2 | 2% | [Link](https://wandb.ai/qwop-rl/qwop-rl-dhbw/runs/dpsde1my) |
-| a-2026-06-12-113046 | [ppo_ent001.yaml](../configs/ppo_ent001.yaml) | 3.000.000 | +36.9 (final) / **+105 @ 1.6M** | 2% (final) / **18% @ 1.6M** | [Link](https://wandb.ai/qwop-rl/qwop-rl-dhbw/runs/4s0cxii6) |
+| a-2026-06-11-164747 | [ppo_default.yaml](../configs/ppo_default.yaml) | 1.000.000 | +41.2 | — | [Link](https://wandb.ai/qwop-rl/qwop-rl-dhbw/runs/dpsde1my) |
+| a-2026-06-12-113046 | [ppo_ent001.yaml](../configs/ppo_ent001.yaml) | 3.000.000 | +105 @ 1.6M | — | [Link](https://wandb.ai/qwop-rl/qwop-rl-dhbw/runs/4s0cxii6) |
+| a-2026-06-13 (Run 4) | [ppo_ent001_finetune.yaml](../configs/ppo_ent001_finetune.yaml) | 10.000.000 | +168 @ 8.65M | 75% | [Link](https://wandb.ai/qwop-rl/qwop-rl-dhbw/runs/mk6f4gw4) |
+| a-2026-06-13 (Run 5) | [ppo_run5.yaml](../configs/ppo_run5.yaml) | 3.000.000 | +177 @ 1.75M | **94%** | [Link](https://wandb.ai/qwop-rl/qwop-rl-dhbw/runs/a-2026-06-13-203134) |
 
 ---
 
@@ -210,6 +212,19 @@ Das ist kein Widerspruch — die Messungen unterscheiden sich grundlegend:
 
 **Fazit:** Die 75% aus eval.py sind die relevante Zahl für die Präsentation.
 
+### Wichtige methodische Erkenntnis: Peak ≠ bestes Modell
+
+**Beobachtung in Run 5:** Wenn ein Fine-Tuning-Run vom besten Checkpoint startet, zeigt W&B am Anfang `success_rate: 1.0` — obwohl das Modell nicht perfekt ist.
+
+**Warum:** Der W&B-Durchschnitt basiert auf einem rollenden Fenster der letzten 100 Episoden. Zu Beginn eines neuen Runs sind noch sehr wenige Episoden im Puffer — 1-2 gute Episoden reichen für 100%. Erst nach ~100 Episoden ist der Puffer voll und die echte Erfolgsrate sichtbar.
+
+**Konsequenz:** Den "Peak" in W&B am Anfang eines Runs zu nehmen ist irreführend. Das beste Modell ist nicht der höchste Spike, sondern der Zeitpunkt wo sich die Kurve **stabilisiert hat** — also wo der Durchschnitt über viele Episoden stabil auf einem hohen Niveau bleibt.
+
+**Bessere Strategie für Checkpoint-Auswahl:**
+- Nicht den höchsten Spike nehmen
+- Den Bereich nehmen wo die Kurve über mehrere hundert Logging-Steps stabil hoch bleibt
+- Mehrere Checkpoints in diesem stabilen Bereich mit eval.py (20+ Episoden) vergleichen
+
 ### Checkpoint-Evaluation (2026-06-13)
 
 | Checkpoint | Mean | Median | Std | Erfolgsrate | Fazit |
@@ -259,19 +274,101 @@ Weitermachen vom besten Checkpoint mit erhöhter `n_steps` für längere Strateg
 
 ---
 
-## Vergleich mit Teamkollegen
+## Run 5 — n_steps erhöht (geplant)
+
+**Config:** [configs/ppo_run5.yaml](../configs/ppo_run5.yaml)
+**Start:** `models/ppo_ent001_finetune/best.zip` (= model_8650000_steps.zip, 75% Erfolgsrate)
+**W&B:** *(Link nach Training eintragen)*
+
+### Änderungen gegenüber Run 4
+| Parameter | Run 4 | Run 5 |
+|---|---|---|
+| n_steps | 2048 | **4096** |
+| learning_rate | 1e-4 | 1e-4 |
+| ent_coef | 0.01 | 0.01 |
+| total_timesteps | 10.000.000 | **3.000.000** |
+| start | vom 1.65M-Checkpoint | **vom 8.65M-Checkpoint** |
+
+### Was bedeutet n_steps erhöhen?
+
+`n_steps` bestimmt wie viele Spielschritte die KI sammelt bevor sie einmal lernt (ein Update macht). Mit `n_steps: 4096` statt 2048:
+
+- Die KI sieht **doppelt so viele Erfahrungen** bevor sie ihre Gewichte anpasst
+- Updates werden **stabiler** — weniger Rauschen durch einzelne schlechte Episoden
+- Die KI kann **längere Strategien** erkennen — z.B. dass eine bestimmte Bewegungssequenz über viele Steps hinweg gut ist
+- **Nachteil:** Lernt etwas langsamer (weniger Updates pro Zeit)
+
+### Hypothese
+Stabilere Updates durch mehr gesammelte Erfahrung reduzieren Catastrophic Forgetting und erlauben der KI die bereits gute Strategie (75% Erfolgsrate) weiter zu verfeinern statt zu verlieren.
+
+### Ergebnis (50 Episoden, deterministic=False)
+| Metrik | Wert |
+|---|---|
+| **Erfolgsrate** | **90%** (45/50 Episoden) |
+| Mean Reward | +161.50 |
+| Median Reward | +163.00 |
+| **Std** | **40.13** (Run 4: 81 — fast halbiert!) |
+| Min | 51.19 |
+| Max | 227.01 |
+
+**Hypothese bestätigt:** `n_steps: 4096` hat die Konsistenz deutlich verbessert. Std halbiert, Erfolgsrate von 75% auf 90% gestiegen. Mean unverändert — das Modell ist nicht schneller, aber zuverlässiger.
+
+### Checkpoint-Evaluation (2026-06-15)
+
+Manuelle Evaluation mehrerer Checkpoints mit je 50 Episoden via `eval.py --render-every 0`:
+
+| Checkpoint | Mean | Median | Std | Erfolgsrate | Fazit |
+|---|---|---|---|---|---|
+| **model_1750000** | **177** | **166** | 49 | **94%** | **Bestes Modell** |
+| model_2000000 | 170 | 162 | 46 | 92% | Gut aber schlechter |
+| final.zip (3M) | 161 | 163 | 40 | 90% | Konsistenteste Std |
+
+> Noch zu testen: model_2250000 und Peak am Ende (~2.5M-3M Steps) aus W&B-Graph
+
+**`model_1750000_steps.zip` ist bisher das beste Modell** — 94% Erfolgsrate, Mean +177.
+
+Gesichert als `models/ppo_run5/best.zip`:
+```bash
+copy models\ppo_run5\checkpoints\model_1750000_steps.zip models\ppo_run5\best.zip
+```
+
+> **Hinweis:** `models\ppo_run5\` und `models\ppo_ent001_finetune\` sind komplett getrennte Ordner — Run 4 wird durch Run 5 nicht überschrieben.
+
+### Wichtige Erkenntnis: W&B-Graph zeigt nur den Lernprozess
+
+Der W&B-Graph zeigt `success_rate` während des Trainings — **nicht** die echte Modellqualität.
+
+**Warum der Graph ~30-40% zeigt obwohl eval.py 90% ergibt:**
+- Während Training exploriert die KI aktiv (`ent_coef: 0.01`) → absichtlich schlechte Aktionen
+- Der Graph ist verrauscht durch Exploration-Episoden
+- eval.py mit eingefrorenem Modell zeigt die echte Qualität
+
+**Konsequenz für Checkpoint-Auswahl:**
+- Den W&B-Graph nutzen um zu sehen *wann* ein Peak war und *ob* die KI lernt
+- Die finale Qualität immer mit `eval.py --episodes 50` messen
+- Nie nur auf den W&B-Peak verlassen
+
+### Wichtige Erkenntnis: deterministic=True ist für dieses Modell kontraproduktiv
+
+Test mit `--deterministic` ergab: alle 50 Episoden identisch, reward=81.85, steps=1848 — die KI wiederholt dieselbe suboptimale Route endlos.
+
+Ursache: Das Modell wurde mit Sampling trainiert (`ent_coef: 0.01`). Im deterministischen Modus gibt es keinen Zufall mehr — die KI findet die gute Wiggle-Strategie nicht, weil sie immer denselben (schlechten) Weg nimmt.
+
+**Fazit:** `deterministic=False` (Sampling) ist die richtige Eval-Methode für dieses Modell. Die 90% Erfolgsrate ist das ehrliche Ergebnis.
 
 | Wer | Steps | ep_rew_mean | success_rate (W&B) | success_rate (eval) | Besonderheit |
 |---|---|---|---|---|---|
 | Henrik (Run 2) | 1M | +41.2 | 2% | — | Baseline, `ent_coef: 0.0` |
 | Henrik (Run 3) | ~1.6M | +105 | 18% | — | Bester Checkpoint |
-| Henrik (Run 4) | ~8.65M | +168 | **44%** | **75%** | **Bestes Modell, Fine-Tuning** |
+| Henrik (Run 4) | ~8.65M | +168 | 44% | 75% | Fine-Tuning, lr=1e-4 |
+| **Henrik (Run 5)** | ~11.65M | +161 | ~35% | **90%** | **Bestes Modell**, n_steps=4096 |
 | Niko | 5M | — | 9% | — | Bestes bei 5M |
 | Niko | 27.5M | +99 | 17% | — | Nach langem Training |
 | Niko | ~40M | +160 | 39% | — | Bisher bester Niko-Run |
 
 **Wichtigste Erkenntnisse:**
-- `ent_coef: 0.01` + niedrige Learning Rate + Fine-Tuning vom Checkpoint ist die effektivste Strategie
-- Henrik erreicht **75% Erfolgsrate** (eval) bei ~8.65M Steps — Niko hat bei 40M Steps 39% (W&B, nicht direkt vergleichbar)
-- **Catastrophic Forgetting** tritt bei beiden auf — Checkpoints sind entscheidend
-- W&B Success Rate während Training ≠ eval.py Success Rate nach Training (Exploration vs. reines Spielen)
+- `ent_coef: 0.01` + `lr: 1e-4` + `n_steps: 4096` + Fine-Tuning vom Checkpoint ist die beste Strategie
+- **W&B-Graph zeigt den Lernprozess, nicht die Modellqualität** — immer mit `eval.py --episodes 50` messen
+- Henrik erreicht **90% Erfolgsrate** (eval, 50 Episoden) — Nikos bester W&B-Wert ist 39% (nicht direkt vergleichbar)
+- **Catastrophic Forgetting** tritt bei beiden auf — Checkpoints und regelmäßige eval.py-Tests sind entscheidend
+- `deterministic=True` ist für dieses Modell kontraproduktiv — Sampling (`deterministic=False`) ist die richtige Eval-Methode
