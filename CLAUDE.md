@@ -85,6 +85,25 @@ python scripts/train.py \
 python scripts/train.py --config configs/ppo_default.yaml --no-wandb
 ```
 
+### Variante C: Parallelisierung + Hyperparameter-Sweep
+
+```bash
+# 0) Headless-Gate: läuft qwop-gym headless? (Details: Stolperstein 16)
+python scripts/spike_headless.py            # erwartet GRÜN, ~1050 steps/s, kein Fenster
+
+# 1) Parallel-Smoke: 4 headless Envs, winziges Budget — beweist SubprocVecEnv + Auto-Headless
+python scripts/train.py --config configs/ppo_parallel_smoke.yaml --no-wandb
+pgrep -fl chromedriver                       # danach leer (keine Orphans)
+
+# 2) W&B-Sweep (Grid über ent_coef × learning_rate × failure_cost = 18 Kombis)
+wandb sweep configs/sweep_ppo.yaml           # gibt Sweep-ID aus
+wandb agent <entity>/<project>/<id> --count 1   # Dry-Run: 1 Trial
+wandb agent <entity>/<project>/<id>              # voller Sweep
+```
+
+> `n_envs>1` in der Config → `scripts/train.py` erzwingt automatisch Headless (Stolperstein 16).
+> `n_envs=1` bleibt sichtbar (Debugging). RAM/CPU im Blick behalten, ggf. `n_envs` auf 2 senken.
+
 ### Beim ersten Mal auf einer Maschine: Smoke vor langem Lauf
 
 `configs/ppo_smoke.yaml` ist genau dafür da: 10k Steps, 1 Env, ~30s. Bestätigt:
@@ -136,12 +155,12 @@ python scripts/eval.py --model models/<model_dir>/final.zip --episodes 20 --rend
 
 ```
 src/qwop_rl/
-├── envs/      # Gym-Environments (QWOP-Anbindung)
+├── envs/      # Gym-Environments (QWOP-Anbindung); _headless.py = Headless-Patch (Stolperstein 16)
 ├── agents/    # RL-Agent-Wrapper, Trainings-Logik
 └── utils/     # Hilfsfunktionen (Logging, Config-Loader, …)
 
-configs/       # YAML — pro Trainingslauf eine Datei
-scripts/       # CLI-Einstiegspunkte (train.py, eval.py, …)
+configs/       # YAML — Trainings-Configs + sweep_ppo.yaml/ppo_sweep_base.yaml (Sweeps, Stolperstein 17)
+scripts/       # CLI-Einstiegspunkte (train.py, eval.py, spike_headless.py)
 tests/         # pytest, spiegelt src/-Struktur
 docs/          # Architektur + ADRs + Onboarding
 ```
@@ -249,6 +268,16 @@ Diese Liste ist die Sammelstelle für alles, worüber wir oder andere QWOP-RL-Pr
    - Homebrew (`brew install --cask chromedriver`) liefert immer die neueste Version → Mismatch zu Chrome wahrscheinlich. Brew-Cask ist außerdem deprecated (passt macOS-Gatekeeper nicht).
    - Lösung: passende Version manuell von [Chrome-for-Testing](https://googlechromelabs.github.io/chrome-for-testing/) holen, in `bin/chromedriver` legen, in `config/env.yml` referenzieren.
    - Vollständige Snippets pro Plattform: `SETUP.md` Schritt 5.
+   - **Verifiziertes Update-Rezept (macOS arm64):** exakte Driver-URL zur installierten Chrome-Version über die CfT-Milestone-API auflösen (die statische `known-good-versions`-JSON ist teils veraltet gecacht):
+     ```bash
+     # Chrome-Major bestimmen
+     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --version
+     # passende Driver-URL für diesen Milestone (z.B. 150) holen
+     curl -s "https://googlechromelabs.github.io/chrome-for-testing/latest-versions-per-milestone-with-downloads.json" \
+       | python3 -c "import sys,json; d=json.load(sys.stdin)['milestones']['150']; print([x['url'] for x in d['downloads']['chromedriver'] if x['platform']=='mac-arm64'][0])"
+     # laden, entpacken, Quarantäne weg (Stolperstein 7), ins Symlink-Ziel kopieren, chmod +x
+     ```
+     `bin/chromedriver` ist ein Symlink (Ziel z.B. `~/qwop-gym-test/bin/chromedriver`) — beim Update das **Ziel** ersetzen, nicht den Symlink. Alten Driver vorher als `.bak` sichern.
 
 2. **`qwop-gym bootstrap` ist interaktiv.** Per Pipe füttern:
    ```bash
@@ -271,11 +300,17 @@ Diese Liste ist die Sammelstelle für alles, worüber wir oder andere QWOP-RL-Pr
    xattr -d com.apple.quarantine /pfad/zu/chromedriver
    ```
 
-8. **Cleanup nach Test:** Wenn der Trainings-Prozess hängt, bleiben Chrome-Test-Instanzen offen (kleines Fenster auf Position 650,130, leicht zu übersehen). Aufräumen:
-   ```bash
-   pkill -f "user-agent=Chrome-"
-   pkill -f chromedriver
-   ```
+8. **Cleanup nach Test:** Wenn der Trainings-Prozess hängt, bleiben Chrome-Test-Instanzen offen (kleines Fenster auf Position 650,130, leicht zu übersehen). **Einfachster Weg: `bash scripts/cleanup.sh`** — killt alle QWOP-Trainings-Prozesse in der richtigen Reihenfolge und verifiziert.
+   - **Reihenfolge ist entscheidend: erst Python-Eltern, dann Browser-Kinder.** Solange `train.py` lebt, respawnt qwop-gym den Browser → `pkill -f chromedriver` allein läuft ins Leere (Endlos-Respawn). Manuell:
+     ```bash
+     pkill -9 -f "scripts/train.py"                # Trainer
+     pkill -9 -f "wandb agent"                      # Sweep-Agent
+     pkill -9 -f "multiprocessing.spawn"            # SubprocVecEnv-Worker (WICHTIG — von train.py-Pattern NICHT erfasst!)
+     pkill -9 -f "multiprocessing.resource_tracker"
+     pkill -9 -f "user-agent=Chrome-"               # qwop-gym-Browser
+     pkill -9 -f chromedriver
+     ```
+   - **Verwaiste Worker erkennen:** `ps aux | grep multiprocessing-fork` — das sind die SubprocVecEnv-Kinder. Ihre Kommandozeile enthält NICHT „train.py", deshalb muss man explizit auf `multiprocessing.spawn`/`multiprocessing-fork` killen. Der Alltags-Chrome (ohne `user-agent=Chrome-<uuid>`-Marker) und VS Code bleiben unberührt.
 
 9. **`qwop-gym` läuft erst mit ChromeDriver-Setup.** Auf Maschinen ohne Chrome (z.B. CI für reine Lint/Test-Jobs) reicht `pytest` über die jetzigen Tests — die spannen kein Chrome auf.
 
@@ -288,7 +323,8 @@ Diese Liste ist die Sammelstelle für alles, worüber wir oder andere QWOP-RL-Pr
 
 11. **`bin/` und `config/` gehören NICHT ins Repo.** Sind in `.gitignore`. Beide sind maschinenlokal — `bin/chromedriver` ist plattformspezifisch, `config/env.yml` enthält absolute Pfade. **Verwechslungs-Falle:** `config/` (singular, von qwop-gym) ist gitignored, `configs/` (plural, unsere Trainings-YAMLs) bleibt im Repo.
 
-12. **Browser-Vordergrund-Drosselung — Trainings aus Claude heraus funktionieren nicht.** macOS drosselt Chrome-Fenster, sobald sie überdeckt sind. `qwop-gym benchmark`/`train_ppo` und `python scripts/train.py` hängen dann scheinbar — kein Output, Python-Prozess hat 0 % CPU. Symptom: `ps -p <pid> -o time` zeigt seit Minuten dieselbe CPU-Zeit. Lösung: das kleine 660×585-Browserfenster muss vorne sein. **Konsequenz für Claude:** Trainings/Benchmarks NICHT direkt aus dem Tool aufrufen — User soll selbst starten. Code-Validierung (`make_env() + close()`) braucht den Browser-Vordergrund nicht.
+12. **Browser-Vordergrund-Drosselung — sichtbare Trainings aus Claude heraus funktionieren nicht.** macOS drosselt sichtbare Chrome-Fenster, sobald sie überdeckt sind. `qwop-gym benchmark`/`train_ppo` und `python scripts/train.py` (im **sichtbaren** Modus) hängen dann scheinbar — kein Output, Python-Prozess hat 0 % CPU. Symptom: `ps -p <pid> -o time` zeigt seit Minuten dieselbe CPU-Zeit. Lösung: das kleine 660×585-Browserfenster muss vorne sein. **Konsequenz für Claude:** sichtbare Trainings/Benchmarks NICHT direkt aus dem Tool aufrufen — User soll selbst starten. Code-Validierung (`make_env() + close()`) braucht den Browser-Vordergrund nicht.
+    - **Wichtige Präzisierung (verifiziert Juli 2026):** Die Drosselung betrifft nur den **visuellen Draw-Loop** (`requestAnimationFrame`). Die QWOP-**Physik** ist WebSocket-Command-getrieben (`ws.js`: `CMD_STP → fn_step() → game.update()`, `extensions.js`), läuft also unabhängig vom Rendering. **Heißt: headless (oder verdeckt) ist der Durchsatz NICHT betroffen.** Siehe Stolperstein 16 — headless umgeht die Drosselung komplett und macht echte Multi-Env-Parallelität möglich.
 
 13. **macOS-Datenschutz: `~/Documents` blockiert Chromes file://-Zugriff — auch mit Full Disk Access.** Wenn das Repo unter `~/Documents/...` liegt, öffnet Chrome die `QWOP.html` im venv per `file://` und wird von macOS blockiert:
     ```
@@ -310,6 +346,17 @@ Diese Liste ist die Sammelstelle für alles, worüber wir oder andere QWOP-RL-Pr
     ```bash
     find models -name "final.zip" -mmin -60   # zuletzt geschriebene Modelle
     ```
+
+16. **Headless-Training + Parallelisierung (verifiziert Juli 2026).** qwop-gym startet Chrome per Default sichtbar und bietet **keinen** Headless-Kwarg (`WSServer._launch_browser` hardcodet die ChromeOptions). Headless geht trotzdem — via Monkey-Patch. Nutzen: umgeht die Vordergrund-Drosselung (Stolperstein 12) → echte Multi-Env-Parallelität möglich.
+    - **Kritische Flags:** `--headless=new` allein reicht NICHT. QWOP nutzt WebGL (`QWOP.min.js`: `getContext("webgl")`), und Chrome ≥137 hat SwiftShader-WebGL deprecatet. **Ohne `--enable-unsafe-swiftshader` initialisiert der WebGL-Kontext nicht** → das Spiel-JS läuft nicht durch → der WS-Client verbindet nie → 30-s-Server-Timeout + Reconnect-Schleife. Erforderlich: `--headless=new --ignore-gpu-blocklist --enable-unsafe-swiftshader --use-gl=swiftshader --use-angle=swiftshader`.
+    - **Verifiziert:** headless ~1050 steps/s (vs. sichtbar ~1900), Physik läuft, `distance` steigt. Diagnose-Skript: `scripts/spike_headless.py` (nutzt `fork` **nur** für die Diagnose; per `SPIKE_GL=angle|egl|none` andere GL-Varianten testbar).
+    - **Produktion:** Der Headless-Patch lebt in `src/qwop_rl/envs/_headless.py` (`apply_headless_patch()`, idempotent). `scripts/train.py` setzt bei `n_envs>1` automatisch `QWOP_HEADLESS=1`; die top-level Factory `_make_qwop_env` appliziert den Patch dann in **jedem** gespawnten Worker. **Warum Library-Modul und nicht `__main__`:** SB3 `SubprocVecEnv` nutzt auf macOS `spawn` → jeder Worker re-importiert die Factory; ein Patch nur im `__main__` würde in den Workern fehlen (→ sichtbare Fenster → Drosselung zurück). Ein `fork`-Shortcut wie im Spike ist in Produktion **nicht** ok (SB3 vermeidet fork; die harmlose `objc[...] fork()`-Warnung beim Spike-Shutdown zeigt genau das).
+    - **`n_envs=1` bleibt sichtbar** (Debugging). Ab `n_envs>1` → SubprocVecEnv + Auto-Headless.
+    - **Daemon-Falle (verschachtelte Prozesse):** SB3s `SubprocVecEnv` startet Worker als `daemon=True`. qwop-gym spawnt aber INNERHALB jedes Envs einen eigenen WSServer-Prozess (`qwop_env.py`: `self.proc.start()`) → `AssertionError: daemonic processes are not allowed to have children`, alle Worker crashen sofort. Fix: `qwop_rl.envs._vecenv.NonDaemonicSubprocVecEnv` — minimale Subclass, die Worker mit `daemon=False` startet (sonst identisch zu SB3). `train.py` nutzt diese bei `n_envs>1`. Trade-off: bei hartem Crash des Hauptprozesses könnten Worker weiterlaufen → `close()` räumt ab, Fallback `pkill -f chromedriver`.
+
+17. **W&B-Hyperparameter-Sweeps.** `configs/sweep_ppo.yaml` definiert einen Grid-Sweep auf **unser** `scripts/train.py` (nicht qwop-gyms `wandb-agent.py`). Die gesampelten HPs kommen via `wandb.config` als flache **gepunktete** Keys an (`ppo.learning_rate`, `env.kwargs.failure_cost`, …); `apply_sweep_overrides()` in `train.py` merged sie über eine feste Whitelist in die verschachtelte YAML-Config. Der `command:`-Block hat bewusst **kein** `${args}` → keine CLI-Flags, alles läuft über `wandb.config`. Basis-Config: `configs/ppo_sweep_base.yaml`. Start (eigenes Terminal): `wandb sweep configs/sweep_ppo.yaml` → `wandb agent <id> --count 1` (Dry-Run) → `wandb agent <id>`. Screening mit 100k Steps, danach Top-Kombis lang fahren.
+
+18. **Checkpoints + Weitertrainieren.** `scripts/train.py` schreibt via SB3 `CheckpointCallback` alle `training.checkpoint_freq` Steps ein `ckpt_<steps>_steps.zip` in `paths.model_dir`. Weitertrainieren: `training.model_load_file` im YAML auf einen Checkpoint setzen → `PPO.load()` lädt Gewichte **und** Optimizer, `reset_num_timesteps=False` lässt den Step-Zähler weiterlaufen (W&B-Kurve klebt an den alten Verlauf an). **Alte Modelle ohne Checkpoint** (nur `final.zip`) lassen sich zwar evaluieren, aber nicht sauber fortsetzen.
 
 ### Allgemein
 

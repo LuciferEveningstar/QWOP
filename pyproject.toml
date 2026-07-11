@@ -44,7 +44,7 @@ quote-style = "double"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
-pythonpath = ["src"]
+pythonpath = ["src", "scripts"]
 
 # --- MyPy ---
 [tool.mypy]

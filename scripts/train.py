@@ -20,14 +20,20 @@ Environment variables (loaded from .env if present):
 from __future__ import annotations
 
 import argparse
+import functools
 import os
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
 from dotenv import load_dotenv
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    import gymnasium as gym
 
 
 def parse_args() -> argparse.Namespace:
@@ -61,6 +67,67 @@ def parse_args() -> argparse.Namespace:
 def load_config(path: Path) -> dict[str, Any]:
     with path.open() as f:
         return yaml.safe_load(f)
+
+
+def _make_qwop_env(env_config: dict[str, Any] | None) -> gym.Env:
+    """Top-level env factory — spawn-sicher für SubprocVecEnv.
+
+    Muss auf Modulebene liegen (nicht als Closure in main()), damit sie unter
+    der macOS-``spawn``-Startmethode picklebar ist: SubprocVecEnv serialisiert
+    jede ``env_fn`` und re-importiert das Modul im Worker-Prozess. Eine
+    lokale Closure über ``config`` wäre dabei nicht zuverlässig picklebar.
+
+    Ist ``QWOP_HEADLESS=1`` gesetzt, wird der Headless-Patch appliziert, BEVOR
+    das Env gebaut wird. Die Env-Var wird bei spawn an jeden Worker vererbt, der
+    Patch also pro Worker re-appliziert (siehe qwop_rl.envs._headless).
+    """
+    from qwop_rl.envs import make_env
+
+    if os.environ.get("QWOP_HEADLESS") == "1":
+        from qwop_rl.envs._headless import apply_headless_patch
+
+        apply_headless_patch()
+
+    return make_env(env_config)
+
+
+# Whitelist der gepunkteten Keys, die ein W&B-Sweep injizieren darf. Bewusst
+# fest verdrahtet, damit die vom Sweep zurückgespiegelte volle YAML-Config nicht
+# versehentlich verschachtelte Strukturen überschreibt.
+_SWEEP_OVERRIDE_KEYS = (
+    "ppo.learning_rate",
+    "ppo.ent_coef",
+    "ppo.n_steps",
+    "ppo.batch_size",
+    "env.kwargs.failure_cost",
+)
+
+
+def apply_sweep_overrides(config: dict[str, Any], flat: dict[str, Any]) -> dict[str, Any]:
+    """Merge flache W&B-Sweep-Parameter in die verschachtelte YAML-Config.
+
+    Der Sweep-Agent injiziert die gesampelten Hyperparameter via ``wandb.config``
+    als flaches Dict mit gepunkteten Keys (z.B. ``ppo.learning_rate``,
+    ``env.kwargs.failure_cost``). Diese werden — nur für Keys aus
+    :data:`_SWEEP_OVERRIDE_KEYS` — in die passende verschachtelte Stelle
+    geschrieben; fehlende Zwischen-Dicts werden angelegt.
+
+    Für normale (Nicht-Sweep-)Läufe ist das ein No-op, weil ``flat`` dann keine
+    dieser gepunkteten Keys enthält. Mutiert und returned ``config``.
+    """
+    for dotted in _SWEEP_OVERRIDE_KEYS:
+        if dotted not in flat:
+            continue
+        parts = dotted.split(".")
+        node = config
+        for part in parts[:-1]:
+            child = node.get(part)
+            if not isinstance(child, dict):
+                child = {}
+                node[part] = child
+            node = child
+        node[parts[-1]] = flat[dotted]
+    return config
 
 
 def default_run_name() -> str:
@@ -104,6 +171,9 @@ def main() -> int:
             save_code=True,
         )
         print(f"[train] W&B run started: {run_name}")
+        # Bei einem W&B-Sweep injiziert der Agent die gesampelten Hyperparameter
+        # in wandb.config. Vor dem Bau von Env/Modell in die YAML-Config mergen.
+        config = apply_sweep_overrides(config, dict(wandb.config))
     else:
         print("[train] W&B logging disabled.")
 
@@ -112,16 +182,36 @@ def main() -> int:
     from stable_baselines3.common.callbacks import CheckpointCallback
     from stable_baselines3.common.vec_env import DummyVecEnv
 
-    from qwop_rl.envs import make_env
+    from qwop_rl.envs._vecenv import NonDaemonicSubprocVecEnv
 
     training_cfg = config.get("training", {})
     n_envs = int(training_cfg.get("n_envs", 1))
     seed = training_cfg.get("seed")
 
-    def _env_factory() -> Any:
-        return make_env(config.get("env"))
+    # Auto-Headless bei Parallelität: mehrere sichtbare Chrome-Fenster würden von
+    # macOS gedrosselt (Stolperstein 12), sobald überdeckt. Ab n_envs>1 also
+    # headless erzwingen. Die Env-Var wird an jeden gespawnten Worker vererbt und
+    # dort in _make_qwop_env ausgewertet. Bei n_envs==1 bleibt der Browser
+    # sichtbar (Debugging). Explizit vorab gesetztes QWOP_HEADLESS respektieren.
+    if n_envs > 1 and "QWOP_HEADLESS" not in os.environ:
+        os.environ["QWOP_HEADLESS"] = "1"
+        print(f"[train] n_envs={n_envs} > 1 → Headless-Modus aktiviert.")
 
-    vec_env = DummyVecEnv([_env_factory for _ in range(n_envs)])
+    # functools.partial über die top-level _make_qwop_env ist spawn-sicher
+    # (picklebar), anders als eine lokale Closure. n_envs>1 → echte
+    # Prozess-Parallelität via SubprocVecEnv; n_envs==1 → DummyVecEnv (einfacher
+    # zu debuggen, kein IPC-Overhead, Einzelfenster-Fall).
+    env_cfg = config.get("env")
+    env_fns: list[Callable[[], gym.Env]] = [
+        functools.partial(_make_qwop_env, env_cfg) for _ in range(n_envs)
+    ]
+    if n_envs > 1:
+        # NonDaemonicSubprocVecEnv statt SB3s SubprocVecEnv: qwop-gym-Envs
+        # spawnen selbst einen WSServer-Kindprozess, was daemonische Worker
+        # nicht dürfen (siehe qwop_rl.envs._vecenv).
+        vec_env: Any = NonDaemonicSubprocVecEnv(env_fns, start_method="spawn")
+    else:
+        vec_env = DummyVecEnv(env_fns)
     if seed is not None:
         vec_env.seed(int(seed))
 

@@ -1,0 +1,53 @@
+# W&B-Sweep: Hyperparameter-Gridsearch für QWOP-PPO.
+#
+# Zielt auf zwei offene Projekt-Hypothesen:
+#   - "Stillstehen"-Problem  → env.kwargs.failure_cost {0, 10}
+#   - zu schwache Exploration → ppo.ent_coef {0.0, 0.01, 0.05}
+#   - plus klassischer LR-Sweep → ppo.learning_rate {1e-4, 3e-4, 1e-3}
+#
+# Runde 1 = 3 × 3 × 2 = 18 Kombis → method: grid (klein, voll enumerierbar).
+#
+# Ablauf (im eigenen Terminal, venv aktiv, .env mit WANDB_API_KEY):
+#   # WICHTIG: Projekt/Entity per CLI-Flag setzen — ein project:-Feld im YAML
+#   # wird beim Agent-Lauf ignoriert ("Ignoring project when running a sweep").
+#   wandb sweep --project qwop-rl-dhbw --entity qwop-rl configs/sweep_ppo.yaml
+#   # → gibt die konkrete Agent-Zeile aus, diese 1:1 kopieren (NICHT die
+#   #   <...>-Platzhalter tippen):
+#   wandb agent qwop-rl/qwop-rl-dhbw/<sweep-id> --count 1   # Dry-Run: 1 Trial
+#   wandb agent qwop-rl/qwop-rl-dhbw/<sweep-id>             # voller Sweep (18 Trials)
+#
+# Die Parameter kommen NICHT als CLI-Flags (command hat kein ${args}), sondern
+# via wandb.config im Agent-Prozess an — apply_sweep_overrides() in train.py
+# liest die gepunkteten Keys und merged sie in configs/ppo_sweep_base.yaml.
+---
+program: scripts/train.py
+method: grid
+
+metric:
+  name: rollout/ep_rew_mean
+  goal: maximize
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - --config
+  - configs/ppo_sweep_base.yaml
+  - --tags
+  - sweep
+
+parameters:
+  ppo.learning_rate:
+    values: [1.0e-4, 3.0e-4, 1.0e-3]
+  ppo.ent_coef:
+    values: [0.0, 0.01, 0.05]
+  env.kwargs.failure_cost:
+    values: [0, 10]
+
+  # ── Runde 2 (erst aktivieren, wenn Runde 1 ausgewertet ist) ──
+  # Achtung: 18 × 3 × 2 = 108 Kombis. Ggf. method auf bayes +
+  # early_terminate umstellen. n_steps*n_envs muss durch batch_size teilbar sein.
+  # ppo.n_steps:
+  #   values: [1024, 2048, 4096]
+  # ppo.batch_size:
+  #   values: [64, 256]
