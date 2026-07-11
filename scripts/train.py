@@ -218,6 +218,13 @@ def main() -> int:
     paths_cfg = config.get("paths", {})
     log_dir = Path(paths_cfg.get("log_dir", f"logs/{run_name}"))
     model_dir = Path(paths_cfg.get("model_dir", f"models/{run_name}"))
+    # In einem W&B-Sweep teilen sich alle Trials dieselbe base-Config (und damit
+    # denselben model_dir) — sonst würde jeder Trial das final.zip des vorherigen
+    # überschreiben. Pro Trial einen eindeutigen Unterordner (run_name = Timestamp)
+    # anhängen, damit alle Modelle erhalten bleiben und einzeln evaluierbar sind.
+    if os.environ.get("WANDB_SWEEP_ID"):
+        model_dir = model_dir / run_name
+        log_dir = log_dir / run_name
     log_dir.mkdir(parents=True, exist_ok=True)
     model_dir.mkdir(parents=True, exist_ok=True)
 
