@@ -29,7 +29,7 @@ metric:
 
 command:
   - ${env}
-  - python
+  - ${interpreter}
   - ${program}
   - --config
   - configs/ppo_sweep_base.yaml
