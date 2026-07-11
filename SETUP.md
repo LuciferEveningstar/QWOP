@@ -153,6 +153,11 @@ pip install -e .
 
 # qwop-gym (das eigentliche Spiel-Env)
 pip install qwop-gym
+
+# Headless-Hook für Parallel-Training (n_envs>1). Optional, aber nötig, damit
+# parallele Läufe headless statt mit 4 sichtbaren Fenstern starten (Stolperstein 16).
+# Maschinenlokal — nach jedem venv-Rebuild erneut ausführen.
+python scripts/install_headless_hook.py
 ```
 
 Verifizieren:
