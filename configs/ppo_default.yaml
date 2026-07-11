@@ -19,12 +19,13 @@ ppo:
   max_grad_norm: 0.5
 
 training:
-  total_timesteps: 12_500_000
-  model_load_file: "models/ppo_default/final_27.5m.zip"
+  total_timesteps: 1_000_000
   seed: 42
-  n_envs: 1
+  n_envs: 4
   eval_freq: 10_000
   checkpoint_freq: 50_000
+  # Zum Weitertrainieren: model_load_file auf einen Checkpoint setzen, z.B.
+  # model_load_file: "models/ppo_default/ckpt_500000_steps.zip"
 
 paths:
   log_dir: logs/ppo_default

@@ -59,6 +59,8 @@ Thumbs.db
 # --- ML-Artefakte ---
 models/
 !models/.gitkeep
+# entpackte SB3-Modelle (gehören nach W&B, nicht ins Git)
+best/
 logs/
 !logs/.gitkeep
 runs/
