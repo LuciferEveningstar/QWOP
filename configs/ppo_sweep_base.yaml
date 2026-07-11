@@ -29,9 +29,10 @@ ppo:
 training:
   total_timesteps: 100_000
   seed: 42
-  # n_envs>1 → SubprocVecEnv + Auto-Headless (im Spike verifiziert, ~1050 steps/s
-  # headless). Bei RAM/CPU-Druck ggf. auf 2 reduzieren (siehe Activity Monitor).
-  n_envs: 4
+  # n_envs>1 → SubprocVecEnv + Auto-Headless. RAM ist der Flaschenhals (~600 MB/Env):
+  #   MacBook Air 8GB → 2 (mehr swappt und wird LANGSAMER, nicht schneller)
+  #   PC 32GB / 7800X3D → 8 (bis ~12-16 experimentierbar, CPU-limitiert)
+  n_envs: 2
   checkpoint_freq: 50_000
 
 paths:

@@ -394,6 +394,45 @@ Modelle landen in `data/PPO-<run-id>/model.zip`.
 
 ---
 
+## 9b. Parallelisierung (`n_envs`) — wie viele Envs auf welcher Maschine?
+
+Ab `n_envs>1` startet `scripts/train.py` mehrere QWOP-Env-Prozesse parallel
+(SubprocVecEnv) und erzwingt automatisch Headless (siehe CLAUDE.md Stolperstein 16 —
+dafür muss der Headless-Hook aus Schritt 4 installiert sein).
+
+**Der Flaschenhals ist RAM, nicht CPU:** jede Env kostet ~600 MB (eigener
+Chrome + WebGL + Python-Worker + WSServer). Zu viele Envs → das OS swappt → das
+Training wird *langsamer*, nicht schneller.
+
+| Maschine | RAM | Empfehlung | Grund |
+|---|---|---|---|
+| MacBook Air M2 | 8 GB | `n_envs: 2` | ~3,8 GB frei → 2×600 MB passt, 4+ swappt |
+| PC 7800X3D | 32 GB | `n_envs: 8` (bis ~12-16 testbar) | RAM reicht locker, CPU (16 Threads) limitiert |
+
+`n_envs` steht in der jeweiligen Config unter `training:` (z.B. `configs/ppo_sweep_base.yaml`).
+Beim Experimentieren die fps in der SB3-Ausgabe beobachten und RAM/CPU im Blick behalten
+(macOS: Activity Monitor; Windows: Task-Manager → Leistung). Fällt die aggregierte fps beim
+Erhöhen von `n_envs`, ist die Grenze überschritten → zurücknehmen.
+
+> **Achtung Durchsatz-Falle:** mehr Envs heißt nicht automatisch schneller. Die SB3-`fps`
+> ist die *aggregierte* Step-Rate über alle Envs. Ein einzelnes headless Env schafft auf dem
+> M2 ~1050 fps; 4 Envs zusammen nur ~800 (Overhead + RAM-Druck). Der Wert von Multi-Env liegt
+> bei PPO in der *diverseren* Erfahrung (stabilere Konvergenz), nicht im reinen Speed. Für
+> echten Speed: bessere Maschine (PC), nicht mehr Envs auf zu wenig RAM.
+
+### Windows-spezifisch
+
+- **Prozess-Cleanup:** `scripts/cleanup.sh` ist ein Bash-Skript (macOS/Linux). Auf Windows
+  hängende Prozesse per Task-Manager beenden oder in PowerShell:
+  `Get-Process chrome, chromedriver, python -ErrorAction SilentlyContinue | Stop-Process -Force`
+  (Vorsicht: killt AUCH deinen normalen Chrome — vorher schließen).
+- **Headless-Hook:** `python scripts/install_headless_hook.py` funktioniert plattformübergreifend
+  (schreibt die `.pth` in die venv-site-packages). Nach jedem venv-Neuaufbau erneut ausführen.
+- **`spawn`** ist auf Windows die einzige Startmethode → derselbe Enkel-Prozess-Mechanismus wie
+  auf macOS, der Headless-Hook ist also genauso nötig.
+
+---
+
 ## 10. Häufige Probleme
 
 ### "ChromeDriver only supports Chrome version X"
