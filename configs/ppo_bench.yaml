@@ -1,0 +1,39 @@
+# Benchmark-Config zum Ausmessen der optimalen n_envs (Durchsatz-Test).
+#
+# Zweck: fps bei verschiedenen n_envs vergleichen. NICHT zum echten Trainieren.
+# total_timesteps groß genug für ~5-6 stabile Iterationen (erste Iteration ist
+# durch Browser-Startup verfälscht → fps aus Iteration 3+ ablesen).
+#
+# n_envs per CLI überschreiben statt Datei zu editieren:
+#   Windows:  $env:QWOP_NENVS=8; python scripts\train.py --config configs\ppo_bench.yaml --no-wandb
+#   -> ODER n_envs hier direkt ändern und mehrfach laufen lassen.
+#
+# Ablesen: die "fps"-Zeile aus Iteration 3-4 notieren, n_envs mit höchster fps gewinnt.
+algorithm: PPO
+
+env:
+  id: QWOP-v1
+  kwargs: {}
+
+ppo:
+  policy: MlpPolicy
+  learning_rate: 3.0e-4
+  n_steps: 2048
+  batch_size: 64
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.0
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+
+training:
+  total_timesteps: 100_000    # reicht für ~5-6 Iterationen zum stabilen Ablesen
+  seed: 42
+  n_envs: 8                   # HIER variieren: 4, 8, 12, 16, 20 durchprobieren
+  # kein checkpoint_freq nötig — reiner Benchmark
+
+paths:
+  log_dir: logs/ppo_bench
+  model_dir: models/ppo_bench
