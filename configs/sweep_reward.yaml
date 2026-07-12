@@ -1,0 +1,42 @@
+# W&B-Sweep: Reward-Shaping gegen Robben.
+#
+# Testet die zwei vorhandenen Hebel gegen das Robben:
+#   - ppo.ent_coef {0.0, 0.01, 0.05}                    Exploration
+#   - env.reward_shaping.upright_weight {0.0, 0.5, 2.0}  Torso-Aufrecht-Bonus
+# 3 x 3 = 9 Kombis → method: grid.
+#
+# upright_weight=0.0 ist die KONTROLL-GRUPPE (Torso-Bonus faktisch aus) — zeigt,
+# ob der Wrapper überhaupt etwas gegen das Robben bewirkt. 2.0 = starkes Gewicht
+# (normalisierte Höhen-Differenzen sind klein, daher evtl. hohes Gewicht nötig).
+#
+# Ablauf (PC, venv aktiv):
+#   wandb sweep --project qwop-rl-dhbw --entity qwop-rl configs\sweep_reward.yaml
+#   wandb agent qwop-rl/qwop-rl-dhbw/<sweep-id> --count 1    # Dry-Run
+#   wandb agent qwop-rl/qwop-rl-dhbw/<sweep-id>              # voller Sweep (9)
+#
+# Auswertung: NICHT nur ep_rew_mean (der Wrapper-Bonus bläht ihn auf!). Der
+# faire Vergleich ist die torso_height im Eval + distance/is_success — hohe
+# Höhe bei erhaltener Distanz = Robben aufgebrochen.
+---
+program: scripts/train.py
+method: grid
+
+metric:
+  name: rollout/ep_rew_mean
+  goal: maximize
+
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - --config
+  - configs/ppo_reward_sweep_base.yaml
+  - --tags
+  - sweep
+  - reward
+
+parameters:
+  ppo.ent_coef:
+    values: [0.0, 0.01, 0.05]
+  env.reward_shaping.upright_weight:
+    values: [0.0, 0.5, 2.0]

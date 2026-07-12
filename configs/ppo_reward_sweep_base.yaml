@@ -1,0 +1,45 @@
+# Basis-Config für den Reward-Shaping-Sweep (siehe configs/sweep_reward.yaml).
+#
+# Liefert alle NICHT-gesweepten Werte. Der Sweep überschreibt zur Laufzeit nur
+# ppo.ent_coef und env.reward_shaping.upright_weight via wandb.config.
+#
+# WICHTIG: reward_shaping.enabled MUSS hier true sein, sonst greift der
+# UprightRewardWrapper nicht und der upright_weight-Sweep liefe ins Leere.
+#
+# 100k = Screening-Budget. Achtung: Robben zeigt sich oft erst spät — 100k trennt
+# evtl. zu grob. Wenn die Kurven flach bleiben, Screening auf 300k-500k hochsetzen.
+algorithm: PPO
+
+env:
+  id: QWOP-v1
+  kwargs:
+    time_cost_mult: 10
+    failure_cost: 10
+  reward_shaping:
+    enabled: true
+    upright_weight: 0.5       # vom Sweep überschrieben
+    height_threshold: 0.0     # ggf. vorher kalibrieren (eval torso_height)
+    gate_on_forward: true
+
+ppo:
+  policy: MlpPolicy
+  learning_rate: 1.0e-4       # der Sweep-Gewinner aus dem ersten Lauf
+  n_steps: 2048
+  batch_size: 64
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.0               # vom Sweep überschrieben
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+
+training:
+  total_timesteps: 100_000
+  seed: 42
+  n_envs: 14                  # PC 7800X3D
+  checkpoint_freq: 50_000
+
+paths:
+  log_dir: logs/ppo_reward_sweep
+  model_dir: models/ppo_reward_sweep
