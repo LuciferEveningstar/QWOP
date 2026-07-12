@@ -84,7 +84,8 @@ def make_env(config: dict[str, Any] | None = None) -> gym.Env:
     # das Verhalten unverändert (rückwärtskompatibel — keine bestehende Config
     # muss angepasst werden).
     shaping_cfg = config.get("reward_shaping") or {}
-    if shaping_cfg.get("enabled"):
+    shaping_enabled = bool(shaping_cfg.get("enabled"))
+    if shaping_enabled:
         from qwop_rl.envs._reward import UprightRewardWrapper
 
         env = UprightRewardWrapper(
@@ -94,4 +95,15 @@ def make_env(config: dict[str, Any] | None = None) -> gym.Env:
             gate_on_forward=bool(shaping_cfg.get("gate_on_forward", True)),
         )
 
-    return Monitor(env)
+    # Faire Vergleichsmetriken pro Episode nach W&B/TensorBoard durchreichen
+    # (Monitor loggt info_keywords in ep_info → SB3 → sync_tensorboard → W&B).
+    # NUR für die echte QWOP-Env, deren _build_info diese Keys garantiert
+    # liefert; torso_height nur wenn der Shaping-Wrapper aktiv ist. Für Test-
+    # Dummy-Envs leer lassen, sonst crasht Monitor mit KeyError.
+    info_keywords: tuple[str, ...] = ()
+    if env_id == DEFAULT_ENV_ID:
+        info_keywords = ("distance", "avgspeed", "is_success")
+        if shaping_enabled:
+            info_keywords += ("torso_height",)
+
+    return Monitor(env, info_keywords=info_keywords)
