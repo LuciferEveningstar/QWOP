@@ -1,0 +1,35 @@
+# Mac-Variante des Robben-Malus-Sweeps (zeigt auf ppo_reward_sweep_base_mac.yaml,
+# n_envs=2, 300k Steps). Zum Testen/Kleinlaufen auf dem MacBook.
+#
+# Auf dem Mac funktioniert ${interpreter} (anders als Windows) — kein Pfad-Fix nötig.
+#
+# Ablauf (Mac, venv aktiv):
+#   wandb sweep --project qwop-rl-dhbw --entity qwop-rl configs/sweep_reward_mac.yaml
+#   wandb agent qwop-rl/qwop-rl-dhbw/<sweep-id> --count 1    # 1 Trial testen
+#   wandb agent qwop-rl/qwop-rl-dhbw/<sweep-id> --count 3    # ein paar Kombis
+#   (voller 9er-Sweep besser auf dem PC — Mac ist dafür zu langsam)
+---
+program: scripts/train.py
+method: grid
+
+metric:
+  name: rollout/torso_height
+  goal: maximize
+
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - --config
+  - configs/ppo_reward_sweep_base_mac.yaml
+  - --tags
+  - sweep
+  - reward
+  - penalty
+  - mac
+
+parameters:
+  env.reward_shaping.upright_weight:
+    values: [10.0, 20.0, 40.0]
+  env.reward_shaping.height_threshold:
+    values: [0.35, 0.40, 0.45]

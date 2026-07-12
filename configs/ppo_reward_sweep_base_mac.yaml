@@ -1,0 +1,45 @@
+# Mac-Variante der Reward-Sweep-Basis (identisch zu ppo_reward_sweep_base.yaml,
+# nur n_envs=2 fürs RAM-limitierte MacBook Air 8GB — 14 würde swappen).
+#
+# Gedacht zum TESTEN auf dem Mac (läuft alles? greift der Malus?), NICHT für den
+# vollen 9er-Sweep — dafür ist der Mac zu langsam (n_envs=2 ~5x langsamer als PC).
+# Der grosse Sweep gehört auf den PC (ppo_reward_sweep_base.yaml, n_envs=14).
+#
+# total_timesteps hier bewusst kleiner (300k) fürs schnelle Probelaufen. Willst du
+# doch mehr, Zahl hochsetzen.
+algorithm: PPO
+
+env:
+  id: QWOP-v1
+  kwargs:
+    time_cost_mult: 10
+    failure_cost: 10
+  reward_shaping:
+    enabled: true
+    upright_weight: 10.0      # vom Sweep überschrieben
+    height_threshold: 0.40    # vom Sweep überschrieben
+    gate_on_forward: true
+    penalty_below: true       # Robben (unter Schwelle) wird aktiv bestraft
+
+ppo:
+  policy: MlpPolicy
+  learning_rate: 1.0e-4
+  n_steps: 2048
+  batch_size: 64
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.01              # FEST — moderate Exploration (nicht gesweept)
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+
+training:
+  total_timesteps: 300_000
+  seed: 42
+  n_envs: 2                   # MacBook Air 8GB (mehr swappt)
+  checkpoint_freq: 100_000
+
+paths:
+  log_dir: logs/ppo_reward_sweep_mac
+  model_dir: models/ppo_reward_sweep_mac
