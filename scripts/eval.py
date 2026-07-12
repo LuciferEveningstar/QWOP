@@ -14,6 +14,8 @@ import argparse
 import sys
 from pathlib import Path
 
+import numpy as np
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Play a saved QWOP model.")
@@ -75,12 +77,20 @@ def main() -> int:
         total_reward = 0.0
         steps = 0
         info: dict = {}
+        # Torso-Höhe pro Step sammeln (obs[1] = normalisierte Rumpfhöhe, siehe
+        # UprightRewardWrapper). Direkt aus der Obs gelesen, damit die Analyse
+        # auch OHNE aktives reward_shaping funktioniert — z.B. um einen Robb-
+        # Checkpoint zu vermessen und den height_threshold zu kalibrieren.
+        torso_heights: list[float] = []
         terminated = truncated = False
         while not (terminated or truncated):
             action, _ = model.predict(obs, deterministic=args.deterministic)
             obs, reward, terminated, truncated, info = env.step(action)
             total_reward += float(reward)
             steps += 1
+            obs_arr = np.asarray(obs, dtype=np.float64)
+            if obs_arr.ndim == 1 and obs_arr.shape[0] > 1:
+                torso_heights.append(float(obs_arr[1]))
             if args.render_every and steps % args.render_every == 0:
                 env.render()
 
@@ -98,9 +108,18 @@ def main() -> int:
         time_str = f"{finish_time:.2f}s" if finish_time is not None else "n/a"
         dist_str = f"{distance:.1f}" if distance is not None else "n/a"
         speed_str = f"{avgspeed:.2f}" if avgspeed is not None else "n/a"
+        # torso_height: mean + max über die Episode (normalisiert, [-1,1]).
+        # mean = wie aufrecht im Schnitt (Robben → niedrig, Laufen → höher).
+        if torso_heights:
+            h_mean = sum(torso_heights) / len(torso_heights)
+            h_max = max(torso_heights)
+            height_str = f"mean={h_mean:.3f}/max={h_max:.3f}"
+        else:
+            height_str = "n/a"
         print(
             f"[eval] Episode {ep}: {outcome} | time={time_str} | distance={dist_str} "
-            f"| avgspeed={speed_str} | reward={total_reward:.2f} | steps={steps}"
+            f"| avgspeed={speed_str} | torso_height={height_str} "
+            f"| reward={total_reward:.2f} | steps={steps}"
         )
 
     env.close()
