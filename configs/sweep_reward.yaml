@@ -39,4 +39,7 @@ parameters:
   ppo.ent_coef:
     values: [0.0, 0.01, 0.05]
   env.reward_shaping.upright_weight:
-    values: [0.0, 0.5, 2.0]
+    # 0.0 = Kontrollgruppe (Bonus aus). Bei threshold 0.40 ist das Höhen-Budget
+    # über dem Robb-Gang klein (~0.2-0.4), daher kräftige Gewichte, damit der
+    # Bonus gegen den hohen Basis-Reward (~250/Episode) überhaupt ankommt.
+    values: [0.0, 2.0, 5.0]

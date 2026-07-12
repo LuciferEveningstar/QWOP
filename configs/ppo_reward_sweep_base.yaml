@@ -18,7 +18,8 @@ env:
   reward_shaping:
     enabled: true
     upright_weight: 0.5       # vom Sweep überschrieben
-    height_threshold: 0.0     # ggf. vorher kalibrieren (eval torso_height)
+    height_threshold: 0.40    # kalibriert: Robber liegt bei mean 0.285 / max 0.37
+                              # → 0.40 knapp darüber, damit nur echtes Aufrichten Bonus bringt
     gate_on_forward: true
 
 ppo:
