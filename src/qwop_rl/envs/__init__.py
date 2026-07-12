@@ -93,6 +93,7 @@ def make_env(config: dict[str, Any] | None = None) -> gym.Env:
             upright_weight=float(shaping_cfg.get("upright_weight", 0.5)),
             height_threshold=float(shaping_cfg.get("height_threshold", 0.0)),
             gate_on_forward=bool(shaping_cfg.get("gate_on_forward", True)),
+            penalty_below=bool(shaping_cfg.get("penalty_below", False)),
         )
 
     # Faire Vergleichsmetriken pro Episode nach W&B/TensorBoard durchreichen

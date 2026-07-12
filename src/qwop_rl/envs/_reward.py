@@ -50,6 +50,11 @@ class UprightRewardWrapper(gym.Wrapper):
         Wenn True (Default), wird der Bonus mit der Vorwärtsgeschwindigkeit
         multipliziert → Stehenbleiben bringt nichts (Anti-Reward-Hacking).
         False nur für Ablations-Experimente (riskant: erlaubt Steh-Hack).
+    penalty_below:
+        Wenn True, wird Robben (Rumpfhöhe UNTER der Schwelle) aktiv bestraft
+        (negatives Shaping), statt nur ignoriert. Der Malus ist NICHT gegated,
+        damit Stehenbleiben ihm nicht entkommt. Macht Robben unprofitabel statt
+        nur „weniger gut". Default False = altes Bonus-only-Verhalten.
     """
 
     def __init__(
@@ -59,14 +64,24 @@ class UprightRewardWrapper(gym.Wrapper):
         upright_weight: float = 0.5,
         height_threshold: float = 0.0,
         gate_on_forward: bool = True,
+        penalty_below: bool = False,
     ) -> None:
         super().__init__(env)
         self.upright_weight = float(upright_weight)
         self.height_threshold = float(height_threshold)
         self.gate_on_forward = bool(gate_on_forward)
+        self.penalty_below = bool(penalty_below)
 
     def _shaping_term(self, obs: Any) -> tuple[float, float]:
-        """Berechnet (shaping_bonus, torso_height) aus der Observation.
+        """Berechnet (shaping, torso_height) aus der Observation.
+
+        Zwei Modi:
+        - ``penalty_below=False`` (Default): nur Bonus für aufrechte Haltung
+          über der Schwelle, gegated mit Vorwärtsgeschwindigkeit. Nie negativ.
+        - ``penalty_below=True``: beidseitig — Bonus über der Schwelle (gegated),
+          MALUS unter der Schwelle (Robben). Der Malus ist bewusst NICHT gegated,
+          sonst könnte der Agent der Strafe durch Stehenbleiben (Gate=0) entkommen
+          → er würde nur Robben gegen Rumstehen tauschen.
 
         Defensiv: liefert (0.0, nan) wenn obs kein numerischer Vektor der
         erwarteten Länge ist (schützt Dummy-/Discrete-Envs in Tests).
@@ -76,7 +91,7 @@ class UprightRewardWrapper(gym.Wrapper):
             return 0.0, float("nan")
 
         torso_height = float(arr[_TORSO_POS_Y_IDX])
-        height_bonus = max(0.0, torso_height - self.height_threshold)
+        delta = torso_height - self.height_threshold
 
         if self.gate_on_forward:
             norm_vel_x = float(arr[_TORSO_VEL_X_IDX])
@@ -84,7 +99,16 @@ class UprightRewardWrapper(gym.Wrapper):
         else:
             forward_gate = 1.0
 
-        shaping = self.upright_weight * height_bonus * forward_gate
+        if delta >= 0.0:
+            # Aufrecht: Bonus, gegated (nur bei Vorwärtsbewegung).
+            shaping = self.upright_weight * delta * forward_gate
+        elif self.penalty_below:
+            # Robben (unter Schwelle): Malus, NICHT gegated (Stehen entkommt nicht).
+            shaping = self.upright_weight * delta
+        else:
+            # Bonus-only-Modus: unter Schwelle kein Effekt.
+            shaping = 0.0
+
         return shaping, torso_height
 
     def step(self, action: Any) -> tuple[Any, float, bool, bool, dict[str, Any]]:

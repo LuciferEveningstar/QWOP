@@ -112,6 +112,60 @@ def test_threshold_boundary_gives_zero() -> None:
     assert info["reward_shaping"] == pytest.approx(0.0, abs=1e-6)
 
 
+def test_penalty_below_punishes_crawling() -> None:
+    # penalty_below=True: torso 0.30 unter threshold 0.40 → delta -0.10.
+    # Malus = weight 10 * -0.10 = -1.0 → reward 1.0 - 1.0 = 0.0.
+    env = UprightRewardWrapper(
+        _StubEnv(_obs(0.30, 0.5), reward=1.0),
+        upright_weight=10.0,
+        height_threshold=0.40,
+        penalty_below=True,
+    )
+    _obs_out, reward, _t, _tr, info = env.step(0)
+    assert info["reward_shaping"] == pytest.approx(-1.0, abs=1e-5)
+    assert reward == pytest.approx(0.0, abs=1e-5)
+
+
+def test_penalty_below_not_gated_by_standing() -> None:
+    # Malus greift AUCH beim Stehen (vel_x=-0.5): Robben-Strafe ist nicht gegated,
+    # sonst könnte der Agent ihr durch Rumstehen entkommen.
+    env = UprightRewardWrapper(
+        _StubEnv(_obs(0.30, -0.5), reward=1.0),
+        upright_weight=10.0,
+        height_threshold=0.40,
+        penalty_below=True,
+    )
+    _obs_out, _reward, _t, _tr, info = env.step(0)
+    assert info["reward_shaping"] == pytest.approx(-1.0, abs=1e-5)
+
+
+def test_penalty_below_false_ignores_crawling() -> None:
+    # Ohne penalty_below: unter Schwelle kein Effekt (altes Verhalten).
+    env = UprightRewardWrapper(
+        _StubEnv(_obs(0.30, 0.5), reward=1.0),
+        upright_weight=10.0,
+        height_threshold=0.40,
+        penalty_below=False,
+    )
+    _obs_out, reward, _t, _tr, info = env.step(0)
+    assert info["reward_shaping"] == pytest.approx(0.0)
+    assert reward == pytest.approx(1.0)
+
+
+def test_penalty_below_still_rewards_upright() -> None:
+    # penalty_below ändert den Bonus-Fall nicht: aufrecht+vorwärts → positiver Bonus.
+    # torso 0.6 über threshold 0.40 → delta 0.2, gate 1.0 → 10 * 0.2 = 2.0.
+    env = UprightRewardWrapper(
+        _StubEnv(_obs(0.60, 0.5), reward=1.0),
+        upright_weight=10.0,
+        height_threshold=0.40,
+        penalty_below=True,
+    )
+    _obs_out, reward, _t, _tr, info = env.step(0)
+    assert info["reward_shaping"] == pytest.approx(2.0)
+    assert reward == pytest.approx(3.0)
+
+
 # --- Integration über make_env ---
 
 _SHAPE_ID = "QwopRlShapeDummy-v0"

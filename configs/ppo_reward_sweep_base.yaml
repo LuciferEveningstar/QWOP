@@ -1,13 +1,11 @@
 # Basis-Config für den Reward-Shaping-Sweep (siehe configs/sweep_reward.yaml).
 #
 # Liefert alle NICHT-gesweepten Werte. Der Sweep überschreibt zur Laufzeit nur
-# ppo.ent_coef und env.reward_shaping.upright_weight via wandb.config.
+# env.reward_shaping.upright_weight und env.reward_shaping.height_threshold.
+# ent_coef ist hier FEST auf 0.01 (moderate Exploration), NICHT gesweept.
 #
-# WICHTIG: reward_shaping.enabled MUSS hier true sein, sonst greift der
-# UprightRewardWrapper nicht und der upright_weight-Sweep liefe ins Leere.
-#
-# 100k = Screening-Budget. Achtung: Robben zeigt sich oft erst spät — 100k trennt
-# evtl. zu grob. Wenn die Kurven flach bleiben, Screening auf 300k-500k hochsetzen.
+# WICHTIG: reward_shaping.enabled + penalty_below MÜSSEN hier true sein, sonst
+# greift weder der Wrapper noch der Robben-Malus.
 algorithm: PPO
 
 env:
@@ -17,10 +15,10 @@ env:
     failure_cost: 10
   reward_shaping:
     enabled: true
-    upright_weight: 0.5       # vom Sweep überschrieben
-    height_threshold: 0.40    # kalibriert: Robber liegt bei mean 0.285 / max 0.37
-                              # → 0.40 knapp darüber, damit nur echtes Aufrichten Bonus bringt
+    upright_weight: 10.0      # vom Sweep überschrieben
+    height_threshold: 0.40    # vom Sweep überschrieben
     gate_on_forward: true
+    penalty_below: true       # Robben (unter Schwelle) wird aktiv bestraft
 
 ppo:
   policy: MlpPolicy
@@ -31,12 +29,12 @@ ppo:
   gamma: 0.99
   gae_lambda: 0.95
   clip_range: 0.2
-  ent_coef: 0.0               # vom Sweep überschrieben
+  ent_coef: 0.01              # FEST — moderate Exploration (nicht gesweept)
   vf_coef: 0.5
   max_grad_norm: 0.5
 
 training:
-  total_timesteps: 3_000_000
+  total_timesteps: 2_000_000
   seed: 42
   n_envs: 14                  # PC 7800X3D
   checkpoint_freq: 1_000_000
