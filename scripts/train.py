@@ -256,7 +256,11 @@ def main() -> int:
         name_prefix="ckpt",
     )
 
-    callbacks: list = [checkpoint_cb]
+    # Loggt distance/avgspeed/torso_height als rollout/<key> nach W&B — SB3
+    # tut das für info_keywords nicht von selbst (siehe callbacks-Modul).
+    from qwop_rl.utils.callbacks import ExtraRolloutMetricsCallback
+
+    callbacks: list = [checkpoint_cb, ExtraRolloutMetricsCallback()]
     if use_wandb and wandb_run is not None:
         from wandb.integration.sb3 import WandbCallback
 
