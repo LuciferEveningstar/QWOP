@@ -36,10 +36,10 @@ ppo:
   max_grad_norm: 0.5
 
 training:
-  total_timesteps: 100_000
+  total_timesteps: 3_000_000
   seed: 42
   n_envs: 14                  # PC 7800X3D
-  checkpoint_freq: 50_000
+  checkpoint_freq: 1_000_000
 
 paths:
   log_dir: logs/ppo_reward_sweep

@@ -1,28 +1,36 @@
-# W&B-Sweep: Reward-Shaping gegen Robben.
+# W&B-Sweep: Reward-Shaping gegen Robben (3 Parameter, 3x3x3 = 27 Kombis).
 #
-# Testet die zwei vorhandenen Hebel gegen das Robben:
-#   - ppo.ent_coef {0.0, 0.01, 0.05}                    Exploration
-#   - env.reward_shaping.upright_weight {0.0, 0.5, 2.0}  Torso-Aufrecht-Bonus
-# 3 x 3 = 9 Kombis → method: grid.
+# Testet die drei Hebel gegen das Robben, je 3 Werte → method: grid:
+#   - ppo.ent_coef {0.0, 0.01, 0.05}                          Exploration
+#   - env.reward_shaping.upright_weight {0.0, 2.0, 5.0}        Torso-Aufrecht-Bonus
+#   - env.reward_shaping.height_threshold {0.30, 0.40, 0.50}  ab welcher Höhe Bonus
 #
-# upright_weight=0.0 ist die KONTROLL-GRUPPE (Torso-Bonus faktisch aus) — zeigt,
-# ob der Wrapper überhaupt etwas gegen das Robben bewirkt. 2.0 = starkes Gewicht
-# (normalisierte Höhen-Differenzen sind klein, daher evtl. hohes Gewicht nötig).
+# Kalibrier-Grundlage: der Robber liegt bei torso_height mean ~0.285 / max ~0.37.
+#   threshold 0.30 = knapp über Robb-Mittel (leicht erreichbar)
+#   threshold 0.40 = über Robb-Maximum (fordert echtes Aufrichten)
+#   threshold 0.50 = fordert deutliches Aufrichten (evtl. schwer erreichbar)
+# upright_weight 0.0 = KONTROLL-GRUPPE (Torso-Bonus aus) → zeigt Wrapper-Wirkung.
+#
+# Jeder Trial: 3.000.000 Steps (aus ppo_reward_sweep_base.yaml).
 #
 # Ablauf (PC, venv aktiv):
+#   # ${interpreter} greift auf diesem Windows-Setup NICHT — vor dem Erstellen die
+#   # command-Zeile unten durch den vollen venv-Python-Pfad ersetzen, z.B.:
+#   #   D:\VSCodeProjekte\NeueKonzepteQWOP\QWOP\.venv\Scripts\python.exe
 #   wandb sweep --project qwop-rl-dhbw --entity qwop-rl configs\sweep_reward.yaml
 #   wandb agent qwop-rl/qwop-rl-dhbw/<sweep-id> --count 1    # Dry-Run
-#   wandb agent qwop-rl/qwop-rl-dhbw/<sweep-id>              # voller Sweep (9)
+#   wandb agent qwop-rl/qwop-rl-dhbw/<sweep-id>              # voller Sweep (27)
 #
-# Auswertung: NICHT nur ep_rew_mean (der Wrapper-Bonus bläht ihn auf!). Der
-# faire Vergleich ist die torso_height im Eval + distance/is_success — hohe
-# Höhe bei erhaltener Distanz = Robben aufgebrochen.
+# Auswertung: NICHT ep_rew_mean vergleichen (der Wrapper-Bonus bläht ihn auf und
+# ist je nach upright_weight/threshold unterschiedlich!). Fairer Vergleich:
+# rollout/torso_height (steigt vs. Robb-Baseline 0.285?) UND rollout/distance +
+# is_success (kommt noch voran?). Beide werden via Monitor info_keywords geloggt.
 ---
 program: scripts/train.py
 method: grid
 
 metric:
-  name: rollout/ep_rew_mean
+  name: rollout/torso_height
   goal: maximize
 
 command:
@@ -39,7 +47,6 @@ parameters:
   ppo.ent_coef:
     values: [0.0, 0.01, 0.05]
   env.reward_shaping.upright_weight:
-    # 0.0 = Kontrollgruppe (Bonus aus). Bei threshold 0.40 ist das Höhen-Budget
-    # über dem Robb-Gang klein (~0.2-0.4), daher kräftige Gewichte, damit der
-    # Bonus gegen den hohen Basis-Reward (~250/Episode) überhaupt ankommt.
     values: [0.0, 2.0, 5.0]
+  env.reward_shaping.height_threshold:
+    values: [0.30, 0.40, 0.50]
