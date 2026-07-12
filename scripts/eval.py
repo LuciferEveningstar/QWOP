@@ -74,15 +74,34 @@ def main() -> int:
         obs, _info = env.reset()
         total_reward = 0.0
         steps = 0
+        info: dict = {}
         terminated = truncated = False
         while not (terminated or truncated):
             action, _ = model.predict(obs, deterministic=args.deterministic)
-            obs, reward, terminated, truncated, _info = env.step(action)
+            obs, reward, terminated, truncated, info = env.step(action)
             total_reward += float(reward)
             steps += 1
             if args.render_every and steps % args.render_every == 0:
                 env.render()
-        print(f"[eval] Episode {ep}: reward={total_reward:.2f}, steps={steps}")
+
+        # info aus dem letzten Step enthält die fairen, frames_per_step-
+        # unabhängigen Kennzahlen (qwop_env._build_info): time = In-Game-
+        # Simulationszeit bis Episodenende, distance = zurückgelegte Strecke,
+        # avgspeed = distance/time. "time to finish" ist bei Erfolg genau die
+        # Zeit bis 100m — im Gegensatz zu steps/reward über Modelle mit
+        # unterschiedlichem frames_per_step vergleichbar.
+        finish_time = info.get("time")
+        distance = info.get("distance")
+        avgspeed = info.get("avgspeed")
+        success = bool(info.get("is_success"))
+        outcome = "ZIEL" if success else "Sturz/Timeout"
+        time_str = f"{finish_time:.2f}s" if finish_time is not None else "n/a"
+        dist_str = f"{distance:.1f}" if distance is not None else "n/a"
+        speed_str = f"{avgspeed:.2f}" if avgspeed is not None else "n/a"
+        print(
+            f"[eval] Episode {ep}: {outcome} | time={time_str} | distance={dist_str} "
+            f"| avgspeed={speed_str} | reward={total_reward:.2f} | steps={steps}"
+        )
 
     env.close()
     return 0
