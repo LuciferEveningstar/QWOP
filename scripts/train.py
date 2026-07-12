@@ -249,9 +249,15 @@ def main() -> int:
             **ppo_cfg,
         )
 
+    # CheckpointCallback zählt env.step()-AUFRUFE, nicht echte Steps: bei
+    # SubprocVecEnv ist 1 Aufruf = n_envs Steps. Ohne Teilung käme der Checkpoint
+    # erst nach checkpoint_freq * n_envs echten Steps (bei n_envs=14 also erst bei
+    # 14M statt 1M → nie im 2M-Trial). save_freq durch n_envs teilen, damit
+    # checkpoint_freq sich auf ECHTE Steps bezieht (SB3-Doku-Empfehlung).
     checkpoint_freq = int(training_cfg.get("checkpoint_freq", 1_000_000))
+    save_freq = max(checkpoint_freq // n_envs, 1)
     checkpoint_cb = CheckpointCallback(
-        save_freq=checkpoint_freq,
+        save_freq=save_freq,
         save_path=str(model_dir),
         name_prefix="ckpt",
     )
