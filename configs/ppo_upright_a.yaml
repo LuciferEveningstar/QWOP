@@ -1,0 +1,51 @@
+# Anti-Robben via Reward-Shaping: belohnt aufrechte Haltung (UprightRewardWrapper).
+#
+# Klon von ppo_antirobb_a_base (lr=1e-3, ent=0.05, time_cost=10) PLUS aktiviertem
+# reward_shaping-Block. Der Bonus = upright_weight * max(0, rumpfhöhe - threshold)
+# * vorwärts_gate — belohnt aufrechtes Vorankommen, NICHT reines Stehenbleiben.
+#
+# WICHTIG — height_threshold kalibrieren, bevor du lange trainierst:
+#   1. eval.py auf einem Robb-Checkpoint laufen lassen (z.B.
+#      models/ppo_antirobb_a_base/final.zip) und die mittlere torso_height beim
+#      Robben ablesen (steht in info["torso_height"]).
+#   2. height_threshold knapp ÜBER diesen Robb-Wert setzen, damit nur echtes
+#      Aufrichten Bonus bringt.
+# Die Defaults hier (threshold 0.0, weight 0.5) sind eine ERSTSCHÄTZUNG.
+#
+# Start (PC):
+#   python scripts\train.py --config configs\ppo_upright_a.yaml --run-name upright-a --tags experiment upright
+algorithm: PPO
+
+env:
+  id: QWOP-v1
+  kwargs:
+    time_cost_mult: 10
+    failure_cost: 10
+  reward_shaping:
+    enabled: true
+    upright_weight: 0.5       # Gewicht des Aufrecht-Bonus (an Basis-Reward angepasst halten)
+    height_threshold: 0.0     # normalisierte Rumpfhöhe ab Bonus — KALIBRIEREN (s.o.)
+    gate_on_forward: true     # Bonus × Vorwärtsgeschwindigkeit (Anti-Reward-Hacking)
+
+ppo:
+  policy: MlpPolicy
+  learning_rate: 1.0e-3       # hoch — raus aus dem Robb-Optimum
+  ent_coef: 0.05              # hoch — Explorations-Anreiz
+  n_steps: 2048
+  batch_size: 64
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+
+training:
+  total_timesteps: 5_000_000   # erstmal moderat — nach Kalibrierung ggf. verlängern
+  seed: 42
+  n_envs: 14                   # PC 7800X3D
+  checkpoint_freq: 1_000_000
+
+paths:
+  log_dir: logs/ppo_upright_a
+  model_dir: models/ppo_upright_a

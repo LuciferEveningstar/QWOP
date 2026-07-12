@@ -56,6 +56,10 @@ def make_env(config: dict[str, Any] | None = None) -> gym.Env:
           ``QWOP-v1`` env, defaults from ``config/env.yml`` (created by
           ``qwop-gym bootstrap``) are merged in first, so individual keys can
           be overridden per training run.
+        - ``reward_shaping``: optional mapping to enable
+          :class:`qwop_rl.envs._reward.UprightRewardWrapper` (keys ``enabled``,
+          ``upright_weight``, ``height_threshold``, ``gate_on_forward``).
+          Absent or ``enabled: false`` → no shaping, unchanged behavior.
 
         Anything else is ignored so YAML configs can carry extra metadata.
     """
@@ -74,4 +78,20 @@ def make_env(config: dict[str, Any] | None = None) -> gym.Env:
         kwargs = dict(user_kwargs)
 
     env = gym.make(env_id, **kwargs)
+
+    # Optionales Reward-Shaping VOR Monitor einziehen, damit der Bonus in
+    # rollout/ep_rew_mean auftaucht. Fehlt der Block oder enabled=false, bleibt
+    # das Verhalten unverändert (rückwärtskompatibel — keine bestehende Config
+    # muss angepasst werden).
+    shaping_cfg = config.get("reward_shaping") or {}
+    if shaping_cfg.get("enabled"):
+        from qwop_rl.envs._reward import UprightRewardWrapper
+
+        env = UprightRewardWrapper(
+            env,
+            upright_weight=float(shaping_cfg.get("upright_weight", 0.5)),
+            height_threshold=float(shaping_cfg.get("height_threshold", 0.0)),
+            gate_on_forward=bool(shaping_cfg.get("gate_on_forward", True)),
+        )
+
     return Monitor(env)
