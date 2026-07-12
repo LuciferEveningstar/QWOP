@@ -1,0 +1,42 @@
+# Nachtrainieren einer konkreten Sweep-Kombi zum Anschauen (Eval).
+#
+# So nutzt du diese Config:
+#   1. In W&B (Sweep → Table, nach ep_rew_mean sortiert) die BESTE Kombi ablesen.
+#   2. Unten die drei Werte eintragen: learning_rate, ent_coef, failure_cost.
+#   3. Trainieren (auf dem PC, n_envs anpassen — hier 14 für den 7800X3D):
+#        python scripts\train.py --config configs\ppo_replay.yaml --run-name replay-best
+#   4. Anschauen:
+#        python scripts\eval.py --model models\ppo_replay\final.zip --episodes 5
+#
+# total_timesteps hier bewusst höher als das 100k-Screening (500k), damit die
+# Kombi den entscheidenden Lernbereich (ab ~500k wird's laut den Kurven erst
+# interessant) durchläuft und man wirklich sieht, wie der Agent sich bewegt.
+algorithm: PPO
+
+env:
+  id: QWOP-v1
+  kwargs:
+    failure_cost: 0          # <-- HIER Gewinner-Wert eintragen (0 oder 10)
+
+ppo:
+  policy: MlpPolicy
+  learning_rate: 1.0e-4      # <-- HIER Gewinner-Wert (1.0e-4 / 3.0e-4 / 1.0e-3)
+  ent_coef: 0.0              # <-- HIER Gewinner-Wert (0.0 / 0.01 / 0.05)
+  n_steps: 2048
+  batch_size: 64
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+
+training:
+  total_timesteps: 500_000
+  seed: 42
+  n_envs: 14                 # PC 7800X3D; auf MacBook auf 2 senken
+  checkpoint_freq: 100_000
+
+paths:
+  log_dir: logs/ppo_replay
+  model_dir: models/ppo_replay
