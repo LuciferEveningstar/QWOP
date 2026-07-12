@@ -1,0 +1,42 @@
+# Anti-Robben-Experiment, Variante A: BASELINE (time_cost_mult = 10, Default).
+#
+# Referenz-Lauf: gleiche HPs wie B/C, aber unveränderte Zeitstrafe. Dient zum
+# Vergleich, ob das Hochdrehen von time_cost_mult in B/C das Robben aufbricht.
+#
+# HPs bewusst explorativ (nicht die Sweep-Gewinner): hohe learning_rate + hoher
+# ent_coef, damit der Agent Anreiz hat, aus dem Robb-Optimum auszubrechen und
+# Neues zu probieren, statt das Robben nur zu verfeinern.
+#
+# Start (PC):
+#   python scripts\train.py --config configs\ppo_antirobb_a_base.yaml --run-name antirobb-a-base --tags experiment antirobb
+algorithm: PPO
+
+env:
+  id: QWOP-v1
+  kwargs:
+    time_cost_mult: 10        # Baseline (Default)
+    failure_cost: 10          # Default belassen — success_rate war hoch, Fallen soll teuer bleiben
+    # success_reward: bewusst NICHT gesetzt → Default 50
+
+ppo:
+  policy: MlpPolicy
+  learning_rate: 1.0e-3       # hoch — größere Lernschritte, raus aus dem Robb-Optimum
+  ent_coef: 0.05              # hoch — starker Explorations-Anreiz
+  n_steps: 2048
+  batch_size: 64
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+
+training:
+  total_timesteps: 15_000_000
+  seed: 42
+  n_envs: 14                  # PC 7800X3D
+  checkpoint_freq: 2_000_000
+
+paths:
+  log_dir: logs/ppo_antirobb_a_base
+  model_dir: models/ppo_antirobb_a_base

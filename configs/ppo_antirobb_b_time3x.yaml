@@ -1,0 +1,41 @@
+# Anti-Robben-Experiment, Variante B: time_cost_mult = 30 (3× Baseline).
+#
+# Hypothese: Robben ist langsam → viele Zeitschritte. Eine 3× höhere Zeitstrafe
+# macht langsames Vorankommen teurer → schnellere Fortbewegung wird relativ
+# attraktiver. success_reward bleibt Default (Agent kommt eh an, ~80% success).
+#
+# HPs identisch zu A/C (lr=1e-3, ent_coef=0.05) — nur time_cost_mult variiert.
+#
+# Start (PC):
+#   python scripts\train.py --config configs\ppo_antirobb_b_time3x.yaml --run-name antirobb-b-time3x --tags experiment antirobb
+algorithm: PPO
+
+env:
+  id: QWOP-v1
+  kwargs:
+    time_cost_mult: 30        # 3× Baseline (Default 10)
+    failure_cost: 10
+    # success_reward: Default 50
+
+ppo:
+  policy: MlpPolicy
+  learning_rate: 1.0e-3
+  ent_coef: 0.05
+  n_steps: 2048
+  batch_size: 64
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+
+training:
+  total_timesteps: 15_000_000
+  seed: 42
+  n_envs: 14
+  checkpoint_freq: 2_000_000
+
+paths:
+  log_dir: logs/ppo_antirobb_b_time3x
+  model_dir: models/ppo_antirobb_b_time3x
