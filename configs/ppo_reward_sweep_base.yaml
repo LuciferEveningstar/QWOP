@@ -15,7 +15,7 @@ env:
     failure_cost: 10
   reward_shaping:
     enabled: true
-    upright_weight: 10.0      # vom Sweep überschrieben
+    upright_weight: 0.1       # vom Sweep überschrieben
     height_threshold: 0.40    # vom Sweep überschrieben
     gate_on_forward: true
     penalty_below: true       # Robben (unter Schwelle) wird aktiv bestraft

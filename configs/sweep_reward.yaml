@@ -2,7 +2,7 @@
 #
 # Der Wrapper läuft im penalty_below-Modus (aus der base-Config): Robben unter
 # der Höhen-Schwelle wird aktiv BESTRAFT (nicht nur unbelohnt). Getestet:
-#   - env.reward_shaping.upright_weight {10.0, 20.0, 40.0}   Malus/Bonus-Stärke
+#   - env.reward_shaping.upright_weight {0.05, 0.1, 0.2}     Malus/Bonus-Stärke
 #   - env.reward_shaping.height_threshold {0.35, 0.40, 0.45} Schwelle (Robber ~0.33)
 # ent_coef ist FEST auf 0.01 (in der base-Config), NICHT gesweept.
 # 3 x 3 = 9 Kombis → method: grid. Jeder Trial: 2.000.000 Steps.
@@ -40,6 +40,8 @@ command:
 
 parameters:
   env.reward_shaping.upright_weight:
-    values: [10.0, 20.0, 40.0]
+    # Kalibriert: Basis-Reward ~0.08/Step. weight 10-40 ergab -0.65/Step Malus
+    # (~50-100x zu gross) → Agent starb sofort. 0.05-0.2 = selbe Liga wie Basis.
+    values: [0.05, 0.1, 0.2]
   env.reward_shaping.height_threshold:
     values: [0.35, 0.40, 0.45]

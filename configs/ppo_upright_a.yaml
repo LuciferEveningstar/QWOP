@@ -23,7 +23,7 @@ env:
     failure_cost: 10
   reward_shaping:
     enabled: true
-    upright_weight: 2.0       # kräftig — Höhen-Budget über threshold ist klein
+    upright_weight: 0.1       # kalibriert: Basis-Reward ~0.08/Step, selbe Liga
     height_threshold: 0.40    # kalibriert: Robber bei mean 0.285 / max 0.37
     gate_on_forward: true     # Bonus × Vorwärtsgeschwindigkeit (Anti-Reward-Hacking)
 

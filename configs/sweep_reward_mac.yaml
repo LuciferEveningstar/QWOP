@@ -28,6 +28,9 @@ command:
 
 parameters:
   env.reward_shaping.upright_weight:
-    values: [10.0, 20.0, 40.0]
+    # Neu kalibriert: Basis-Reward ist ~0.08/Step. weight 10-40 ergab -0.65/Step
+    # Malus (~50-100x zu gross) → Agent starb sofort. 0.05-0.2 spielt in derselben
+    # Liga wie der Basis-Reward: Robben unattraktiv, ohne 'sofort sterben'.
+    values: [0.05, 0.1, 0.2]
   env.reward_shaping.height_threshold:
     values: [0.35, 0.40, 0.45]
