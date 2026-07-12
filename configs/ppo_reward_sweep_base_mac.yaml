@@ -1,12 +1,9 @@
 # Mac-Variante der Reward-Sweep-Basis (identisch zu ppo_reward_sweep_base.yaml,
 # nur n_envs=2 fürs RAM-limitierte MacBook Air 8GB — 14 würde swappen).
 #
-# Gedacht zum TESTEN auf dem Mac (läuft alles? greift der Malus?), NICHT für den
-# vollen 9er-Sweep — dafür ist der Mac zu langsam (n_envs=2 ~5x langsamer als PC).
-# Der grosse Sweep gehört auf den PC (ppo_reward_sweep_base.yaml, n_envs=14).
-#
-# total_timesteps hier bewusst kleiner (300k) fürs schnelle Probelaufen. Willst du
-# doch mehr, Zahl hochsetzen.
+# Für den vollen 9er-Sweep auf dem Mac. ACHTUNG: n_envs=2 → ~5x langsamer als der
+# PC. 9 Trials à 2M Steps dauern grob 6-8h — als langer/Über-Nacht-Lauf einplanen,
+# Rechner wach halten (caffeinate -d &).
 algorithm: PPO
 
 env:
@@ -35,10 +32,10 @@ ppo:
   max_grad_norm: 0.5
 
 training:
-  total_timesteps: 300_000
+  total_timesteps: 2_000_000
   seed: 42
   n_envs: 2                   # MacBook Air 8GB (mehr swappt)
-  checkpoint_freq: 100_000
+  checkpoint_freq: 1_000_000
 
 paths:
   log_dir: logs/ppo_reward_sweep_mac
