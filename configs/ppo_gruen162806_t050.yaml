@@ -1,0 +1,50 @@
+# Weitertraining des gruenen Trials 162806 — Variante: Torso-Schwelle 0.5, ent_coef 0.
+#
+# Wie ppo_gruen162806_continue, aber height_threshold 0.45->0.50 (fordert mehr
+# Aufrichtung) und ent_coef 0.01->0.0 (keine Exploration mehr, greift die gelernte
+# Policy schaerfer ab). Startet vom selben 162806-Ausgangsmodell (der vorige
+# continue-Lauf wurde vor dem ersten Checkpoint gestoppt → kein Zwischenstand).
+#
+# VORBEDINGUNG: models/gruen162806/final.zip (162806-Modell vom PC, wie gehabt).
+#
+# Start (Mac, venv aktiv):
+#   caffeinate -d &
+#   python scripts/train.py --config configs/ppo_gruen162806_t050.yaml --run-name gruen162806-t050 --tags experiment continue gruen
+algorithm: PPO
+
+env:
+  id: QWOP-v1
+  kwargs:
+    time_cost_mult: 10
+    failure_cost: 10
+  reward_shaping:
+    enabled: true
+    upright_weight: 0.2
+    height_threshold: 0.50    # war 0.45 — mehr Aufrichtung gefordert
+    gate_on_forward: true
+    penalty_below: true
+    speed_weight: 0.1
+
+ppo:
+  policy: MlpPolicy
+  learning_rate: 1.0e-4
+  n_steps: 2048
+  batch_size: 64
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.0             # war 0.01 — keine Exploration mehr
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+
+training:
+  total_timesteps: 10_000_000
+  model_load_file: "models/gruen162806/final.zip"
+  seed: 42
+  n_envs: 2
+  checkpoint_freq: 1_000_000
+
+paths:
+  log_dir: logs/gruen162806_t050
+  model_dir: models/gruen162806_t050
