@@ -1,0 +1,40 @@
+# W&B-Sweep (PC): Speed-Bonus vom 2M-Stand des Trials i-2026-07-13-023715.
+#
+# Baut auf dem Torso-Gewinner (upright_weight 0.2, threshold 0.45) auf und sucht
+# den richtigen speed_weight, damit schnelles Laufen das sichere Kriechen schlaegt.
+# 6 Optionen → method: grid, je Trial +2M Steps (von 2M weiter, total 4M).
+#
+# speed_weight-Bonus/Step bei 15 m/s: weight*15 →
+#   0.02=0.3 | 0.05=0.75 | 0.1=1.5 | 0.15=2.25 | 0.2=3.0 | 0.3=4.5
+# Zu klein → kriecht weiter; zu gross → 'losstuermen, bei 20m sterben'.
+#
+# Ablauf (PC, venv aktiv):
+#   # ${interpreter} durch venv-Pfad ersetzen (Windows):
+#   #   D:\VSCodeProjekte\NeueKonzepteQWOP\QWOP\.venv\Scripts\python.exe
+#   wandb sweep --project qwop-rl-dhbw --entity qwop-rl configs\sweep_speed_023715.yaml
+#   wandb agent qwop-rl/qwop-rl-dhbw/<sweep-id> --count 1    # Dry-Run
+#   wandb agent qwop-rl/qwop-rl-dhbw/<sweep-id>              # voller Sweep (6)
+#
+# Auswertung: rollout/avgspeed (soll STEIGEN) UND rollout/success_rate (darf NICHT
+# einbrechen). Ideal = beides hoch. success bricht ein → speed_weight zu gross.
+---
+program: scripts/train.py
+method: grid
+
+metric:
+  name: rollout/avgspeed
+  goal: maximize
+
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - --config
+  - configs/ppo_speed_023715_base.yaml
+  - --tags
+  - sweep
+  - speed
+
+parameters:
+  env.reward_shaping.speed_weight:
+    values: [0.02, 0.05, 0.1, 0.15, 0.2, 0.3]
