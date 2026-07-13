@@ -1,0 +1,48 @@
+# W&B-Sweep: Speed-Bonus gegen Kriechen.
+#
+# Problem (beobachtet): der Agent KANN laufen (~15 m/s), faellt aber nach ~20m —
+# wenn er stattdessen kriecht, kommt er sicher ins Ziel (~3 m/s). Der Reward
+# belohnt Ankommen mehr als schnelles-aber-riskantes Laufen. Ein Speed-Bonus soll
+# das kippen: schnelle Meter werden wertvoller als langsame.
+#
+# Variiert NUR speed_weight (Torso-Shaping fest auf den Gewinnern):
+#   - env.reward_shaping.speed_weight {0.05, 0.1, 0.2}
+# 3 Runs → method: grid. Jeder Trial 5M Steps, startet vom besten bisherigen
+# Modell (continue-w01/final.zip) via model_load_file.
+#
+# Speed-Bonus/Step bei 15 m/s: weight*15 → 0.05=0.75, 0.1=1.5, 0.2=3.0. Zu klein
+# → Kriechen bleibt besser; zu gross → 'losstuermen und bei 20m sterben'. Der
+# Sweep sucht die Balance.
+#
+# Ablauf (PC, venv aktiv):
+#   # ${interpreter} durch venv-Pfad ersetzen (Windows):
+#   #   D:\VSCodeProjekte\NeueKonzepteQWOP\QWOP\.venv\Scripts\python.exe
+#   wandb sweep --project qwop-rl-dhbw --entity qwop-rl configs\sweep_speed.yaml
+#   wandb agent qwop-rl/qwop-rl-dhbw/<sweep-id> --count 1    # Dry-Run
+#   wandb agent qwop-rl/qwop-rl-dhbw/<sweep-id>              # voller Sweep (3)
+#
+# Auswertung: rollout/avgspeed (soll STEIGEN) UND rollout/success_rate (darf NICHT
+# einbrechen). Ideal: hoehere avgspeed bei gehaltener/steigender success_rate =
+# schnelles zuverlaessiges Laufen. Bricht success_rate ein → speed_weight zu gross
+# (er stirbt beim Rasen).
+---
+program: scripts/train.py
+method: grid
+
+metric:
+  name: rollout/avgspeed
+  goal: maximize
+
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - --config
+  - configs/ppo_speed_sweep_base.yaml
+  - --tags
+  - sweep
+  - speed
+
+parameters:
+  env.reward_shaping.speed_weight:
+    values: [0.05, 0.1, 0.2]

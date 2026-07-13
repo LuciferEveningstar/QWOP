@@ -1,0 +1,50 @@
+# Basis-Config für den Speed-Sweep (siehe sweep_speed.yaml).
+#
+# Baut auf den Robben-Malus-Gewinnern auf (Torso-Shaping FEST: upright_weight 0.1,
+# threshold 0.45, penalty_below) und fügt den neuen kontinuierlichen Speed-Bonus
+# dazu. Der Sweep variiert nur speed_weight → findet, wie stark schnelles Laufen
+# belohnt werden muss, damit es das sichere langsame Kriechen schlägt.
+#
+# Startpunkt: das beste bisherige Modell (continue-w01, ~10M, laeuft schon
+# aufrecht mit Tempo-Ansaetzen) via model_load_file weitertrainieren.
+algorithm: PPO
+
+env:
+  id: QWOP-v1
+  kwargs:
+    time_cost_mult: 10
+    failure_cost: 10
+  reward_shaping:
+    enabled: true
+    upright_weight: 0.1       # fest (Gewinner)
+    height_threshold: 0.45    # fest (Gewinner)
+    gate_on_forward: true
+    penalty_below: true
+    speed_weight: 0.1         # vom Sweep überschrieben
+
+ppo:
+  policy: MlpPolicy
+  learning_rate: 1.0e-4
+  n_steps: 2048
+  batch_size: 64
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+
+training:
+  total_timesteps: 5_000_000
+  # Vom besten bisherigen Modell weiter (laeuft schon aufrecht). Auf dem Mac
+  # existiert continue-w01/final.zip; auf dem PC ggf. Pfad anpassen oder leeren
+  # (dann frisch). model_load_file laedt Gewichte+Optimizer, Step-Zaehler laeuft weiter.
+  model_load_file: "models/ppo_continue_w01/final.zip"
+  seed: 42
+  n_envs: 14                  # PC 7800X3D; Mac auf 2 senken
+  checkpoint_freq: 1_000_000
+
+paths:
+  log_dir: logs/ppo_speed_sweep
+  model_dir: models/ppo_speed_sweep

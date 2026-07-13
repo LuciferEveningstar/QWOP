@@ -166,6 +166,46 @@ def test_penalty_below_still_rewards_upright() -> None:
     assert reward == pytest.approx(3.0)
 
 
+def test_speed_bonus_rewards_forward_velocity() -> None:
+    # obs[3]=-0.125 → raw vel_x = -0.125*40+20 = 15 m/s. speed_weight=0.1 → +1.5.
+    # torso 0.30 unter threshold 0.40, ohne penalty → Torso-Shaping 0, nur Speed.
+    env = UprightRewardWrapper(
+        _StubEnv(_obs(0.30, -0.125), reward=1.0),
+        upright_weight=10.0,
+        height_threshold=0.40,
+        speed_weight=0.1,
+    )
+    _obs_out, reward, _t, _tr, info = env.step(0)
+    assert info["reward_shaping"] == pytest.approx(1.5)
+    assert reward == pytest.approx(2.5)
+
+
+def test_speed_bonus_zero_when_standing() -> None:
+    # Stehen: obs[3]=-0.5 → raw = 0 m/s → max(0,0) → kein Speed-Bonus.
+    env = UprightRewardWrapper(
+        _StubEnv(_obs(0.30, -0.5), reward=1.0),
+        upright_weight=10.0,
+        height_threshold=0.40,
+        speed_weight=0.1,
+    )
+    _obs_out, _reward, _t, _tr, info = env.step(0)
+    assert info["reward_shaping"] == pytest.approx(0.0)
+
+
+def test_speed_bonus_adds_to_torso_shaping() -> None:
+    # Aufrecht (torso 0.60, delta 0.20, gate: raw 15→norm-0.125, gate=0.375)
+    # Torso-Bonus = 10 * 0.20 * 0.375 = 0.75; Speed = 0.1*15 = 1.5; Summe 2.25.
+    env = UprightRewardWrapper(
+        _StubEnv(_obs(0.60, -0.125), reward=1.0),
+        upright_weight=10.0,
+        height_threshold=0.40,
+        penalty_below=True,
+        speed_weight=0.1,
+    )
+    _obs_out, _reward, _t, _tr, info = env.step(0)
+    assert info["reward_shaping"] == pytest.approx(0.75 + 1.5)
+
+
 # --- Integration über make_env ---
 
 _SHAPE_ID = "QwopRlShapeDummy-v0"

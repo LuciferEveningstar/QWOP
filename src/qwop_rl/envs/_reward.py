@@ -31,6 +31,11 @@ _TORSO_VEL_X_IDX = 3
 # Vorwärts-Gate: stehen/rückwärts ergeben Gate 0, echtes Vorwärts > 0.
 _VEL_X_ZERO_NORM = -0.5
 
+# vel_x-Normalisierung (qwop_env): Normalizable(-20, 60) → center=20, maxdev=40.
+# Rückrechnung norm → echte m/s: raw = norm * 40 + 20.
+_VEL_X_SCALE = 40.0
+_VEL_X_CENTER = 20.0
+
 
 class UprightRewardWrapper(gym.Wrapper):
     """Belohnt aufrechte Haltung, aber nur während Vorwärtsbewegung.
@@ -55,6 +60,12 @@ class UprightRewardWrapper(gym.Wrapper):
         (negatives Shaping), statt nur ignoriert. Der Malus ist NICHT gegated,
         damit Stehenbleiben ihm nicht entkommt. Macht Robben unprofitabel statt
         nur „weniger gut". Default False = altes Bonus-only-Verhalten.
+    speed_weight:
+        Gewicht eines zusätzlichen, KONTINUIERLICHEN Speed-Bonus: belohnt echte
+        Vorwärtsgeschwindigkeit (m/s, aus obs[3] zurückgerechnet) linear pro Step.
+        Nur der positive Vorwärtsanteil zählt (rückwärts/stehen = 0). Zielt darauf,
+        schnelles Laufen attraktiver zu machen als sicheres langsames Kriechen.
+        Default 0.0 = kein Speed-Bonus (unverändert).
     """
 
     def __init__(
@@ -65,12 +76,14 @@ class UprightRewardWrapper(gym.Wrapper):
         height_threshold: float = 0.0,
         gate_on_forward: bool = True,
         penalty_below: bool = False,
+        speed_weight: float = 0.0,
     ) -> None:
         super().__init__(env)
         self.upright_weight = float(upright_weight)
         self.height_threshold = float(height_threshold)
         self.gate_on_forward = bool(gate_on_forward)
         self.penalty_below = bool(penalty_below)
+        self.speed_weight = float(speed_weight)
 
     def _shaping_term(self, obs: Any) -> tuple[float, float]:
         """Berechnet (shaping, torso_height) aus der Observation.
@@ -108,6 +121,13 @@ class UprightRewardWrapper(gym.Wrapper):
         else:
             # Bonus-only-Modus: unter Schwelle kein Effekt.
             shaping = 0.0
+
+        # Kontinuierlicher Speed-Bonus: echte Vorwärts-m/s aus obs[3]
+        # zurückrechnen (raw = norm*40 + 20), nur positiver Anteil zählt.
+        # Belohnt schnelles Laufen linear — soll Kriechen unattraktiver machen.
+        if self.speed_weight:
+            raw_vel_x = float(arr[_TORSO_VEL_X_IDX]) * _VEL_X_SCALE + _VEL_X_CENTER
+            shaping += self.speed_weight * max(0.0, raw_vel_x)
 
         return shaping, torso_height
 

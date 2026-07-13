@@ -102,6 +102,7 @@ _SWEEP_OVERRIDE_KEYS = (
     "env.kwargs.failure_cost",
     "env.reward_shaping.upright_weight",
     "env.reward_shaping.height_threshold",
+    "env.reward_shaping.speed_weight",
 )
 
 
