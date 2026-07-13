@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
 from pathlib import Path
 
 import numpy as np
@@ -43,6 +44,16 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Render every Nth step (default: 4 → ~15 Hz). Lower = smoother but"
             " slower; higher = faster but choppier. Set to 0 to disable rendering."
+        ),
+    )
+    parser.add_argument(
+        "--fps",
+        type=float,
+        default=0.0,
+        help=(
+            "Künstliche Verlangsamung: max. Frames pro Sekunde (echter time.sleep"
+            " pro Step). Default 0 = kein Limit (so schnell wie möglich). z.B. 30"
+            " für flüssiges, echtzeitnahes Abspielen, 10 für Zeitlupe."
         ),
     )
     return parser.parse_args()
@@ -82,8 +93,12 @@ def main() -> int:
         # auch OHNE aktives reward_shaping funktioniert — z.B. um einen Robb-
         # Checkpoint zu vermessen und den height_threshold zu kalibrieren.
         torso_heights: list[float] = []
+        # Ziel-Dauer pro Step aus --fps (0 = kein Limit). time.sleep bremst das
+        # sonst so-schnell-wie-möglich laufende Abspielen auf echtzeitnahes Tempo.
+        frame_budget = 1.0 / args.fps if args.fps > 0 else 0.0
         terminated = truncated = False
         while not (terminated or truncated):
+            step_start = time.perf_counter()
             action, _ = model.predict(obs, deterministic=args.deterministic)
             obs, reward, terminated, truncated, info = env.step(action)
             total_reward += float(reward)
@@ -93,6 +108,11 @@ def main() -> int:
                 torso_heights.append(float(obs_arr[1]))
             if args.render_every and steps % args.render_every == 0:
                 env.render()
+            # Auf das Frame-Budget warten (nur wenn --fps gesetzt).
+            if frame_budget:
+                elapsed = time.perf_counter() - step_start
+                if elapsed < frame_budget:
+                    time.sleep(frame_budget - elapsed)
 
         # info aus dem letzten Step enthält die fairen, frames_per_step-
         # unabhängigen Kennzahlen (qwop_env._build_info): time = In-Game-
