@@ -56,6 +56,17 @@ def parse_args() -> argparse.Namespace:
             " für flüssiges, echtzeitnahes Abspielen, 10 für Zeitlupe."
         ),
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help=(
+            "Fester Seed für Episode 1 (jede weitere Episode: seed+1, ...). Macht"
+            " Läufe reproduzierbar. Ohne --seed wird ein Zufalls-Basisseed genutzt"
+            " und am Ende ausgegeben. Zum EXAKTEN Nachspielen des schnellsten Laufs:"
+            " --seed <ausgegebener Seed> --episodes 1 --deterministic."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -83,8 +94,23 @@ def main() -> int:
     )
     model = PPO.load(args.model, env=env)
 
+    # Basis-Seed: fest (--seed) oder zufällig. Jede Episode nutzt base_seed+ep,
+    # sodass jeder Lauf über seinen Seed exakt reproduzierbar ist. numpy statt
+    # random.random(), damit auch ohne --seed ein konkreter, ausgebbarer Wert
+    # entsteht.
+    base_seed = args.seed if args.seed is not None else int(np.random.randint(0, 2**31 - 1))
+    print(f"[eval] Basis-Seed: {base_seed}")
+
+    # Schnellsten erfolgreichen Lauf (höchste avgspeed bei is_success) mitschreiben.
+    best_speed = -1.0
+    best_seed: int | None = None
+    best_stats = ""
+
     for ep in range(1, args.episodes + 1):
-        obs, _info = env.reset()
+        ep_seed = base_seed + ep
+        obs, _info = env.reset(seed=ep_seed)
+        # Auch den Policy-RNG seeden, sonst ist Sampling nicht reproduzierbar.
+        model.set_random_seed(ep_seed)
         total_reward = 0.0
         steps = 0
         info: dict = {}
@@ -137,12 +163,30 @@ def main() -> int:
         else:
             height_str = "n/a"
         print(
-            f"[eval] Episode {ep}: {outcome} | time={time_str} | distance={dist_str} "
-            f"| avgspeed={speed_str} | torso_height={height_str} "
+            f"[eval] Episode {ep} (seed={ep_seed}): {outcome} | time={time_str} "
+            f"| distance={dist_str} | avgspeed={speed_str} | torso_height={height_str} "
             f"| reward={total_reward:.2f} | steps={steps}"
         )
 
+        # Schnellsten ERFOLGREICHEN Lauf mitschreiben (höchste avgspeed bei Finish).
+        if success and avgspeed is not None and float(avgspeed) > best_speed:
+            best_speed = float(avgspeed)
+            best_seed = ep_seed
+            best_stats = f"avgspeed={speed_str}, time={time_str}, distance={dist_str}"
+
     env.close()
+
+    # Zusammenfassung: der schnellste erfolgreiche Lauf + exakter Reproduktions-Befehl.
+    print()
+    if best_seed is not None:
+        print(f"[eval] Schnellster ZIEL-Lauf: seed={best_seed} ({best_stats})")
+        print(
+            f"[eval] Exakt nachspielen (langsam): python scripts/eval.py "
+            f"--model {args.model} --episodes 1 --seed {best_seed - 1} "
+            f"--deterministic --fps 30 --render-every 1"
+        )
+    else:
+        print("[eval] Kein erfolgreicher (ZIEL-)Lauf in dieser Session.")
     return 0
 
 
