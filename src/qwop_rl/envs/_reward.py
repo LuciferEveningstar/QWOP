@@ -90,6 +90,11 @@ class UprightRewardWrapper(gym.Wrapper):
         penalty_below: bool = False,
         speed_weight: float = 0.0,
         gait_weight: float = 0.0,
+        replace_base: bool = False,
+        distance_weight: float = 1.0,
+        time_penalty: float = 0.0,
+        success_reward: float = 50.0,
+        failure_cost: float = 10.0,
     ) -> None:
         super().__init__(env)
         self.upright_weight = float(upright_weight)
@@ -98,6 +103,14 @@ class UprightRewardWrapper(gym.Wrapper):
         self.penalty_below = bool(penalty_below)
         self.speed_weight = float(speed_weight)
         self.gait_weight = float(gait_weight)
+        # Basis-Reward-Ersatz (entkoppelt Speed von Distanz):
+        self.replace_base = bool(replace_base)
+        self.distance_weight = float(distance_weight)
+        self.time_penalty = float(time_penalty)
+        self.success_reward = float(success_reward)
+        self.failure_cost = float(failure_cost)
+        self._last_distance: float | None = None
+        self._last_time: float | None = None
 
     def _shaping_term(self, obs: Any) -> tuple[float, float]:
         """Berechnet (shaping, torso_height) aus der Observation.
@@ -152,8 +165,45 @@ class UprightRewardWrapper(gym.Wrapper):
 
         return shaping, torso_height
 
+    def _base_reward(self, reward: float, terminated: bool, info: dict[str, Any]) -> float:
+        """Ersetzt den qwop-Basis-Reward, um Speed von Distanz zu entkoppeln.
+
+        Statt ``Σ v·0.01`` (was sich zu Distanz aufsummiert) wird der Reward
+        selbst gebaut: kleiner Distanz-Anteil (``distance_weight·Δdistanz``) minus
+        Zeitstrafe (``time_penalty·Δzeit``). Mit kleinem distance_weight + hoher
+        time_penalty dominiert Tempo statt Distanz. Ziel-/Sturz-Boni bleiben.
+        Braucht ``distance``/``time`` aus info (sonst faellt auf reward zurueck).
+        """
+        dist = info.get("distance")
+        t = info.get("time")
+        if dist is None or t is None:
+            return reward  # kein QWOP-Env (Test) → unveraendert
+        if self._last_distance is None:
+            d_dist, d_time = 0.0, 0.0
+        else:
+            d_dist = float(dist) - self._last_distance
+            d_time = float(t) - self._last_time  # type: ignore[operator]
+        self._last_distance = float(dist)
+        self._last_time = float(t)
+
+        new_reward = self.distance_weight * d_dist - self.time_penalty * d_time
+        # Terminal-Boni beibehalten (wie qwop-gym).
+        if terminated:
+            if bool(info.get("is_success")):
+                new_reward += self.success_reward
+            else:
+                new_reward -= self.failure_cost
+        return new_reward
+
+    def reset(self, **kwargs: Any) -> tuple[Any, dict[str, Any]]:
+        self._last_distance = None
+        self._last_time = None
+        return self.env.reset(**kwargs)
+
     def step(self, action: Any) -> tuple[Any, float, bool, bool, dict[str, Any]]:
         obs, reward, terminated, truncated, info = self.env.step(action)
+        if self.replace_base:
+            reward = self._base_reward(float(reward), terminated, info)
         shaping, torso_height = self._shaping_term(obs)
         # Für Logging/Kalibrierung sichtbar machen (W&B / eval.py).
         info["reward_shaping"] = shaping

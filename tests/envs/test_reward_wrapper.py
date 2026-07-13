@@ -234,6 +234,51 @@ def test_gait_bonus_zero_when_standing() -> None:
     assert info["reward_shaping"] == pytest.approx(0.0)
 
 
+class _DistEnv(gym.Env):
+    """Stub, der distance/time in info liefert und mehrere Steps laeuft."""
+
+    metadata: ClassVar[dict[str, Any]] = {"render_modes": []}
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.observation_space = gym.spaces.Box(-1.0, 1.0, shape=(60,), dtype=np.float32)
+        self.action_space = gym.spaces.Discrete(1)
+        self._steps = 0
+
+    def reset(self, *, seed=None, options=None):  # type: ignore[no-untyped-def]
+        super().reset(seed=seed)
+        self._steps = 0
+        return np.zeros(60, dtype=np.float32), {"distance": 0.0, "time": 0.0}
+
+    def step(self, action):  # type: ignore[no-untyped-def]
+        self._steps += 1
+        # pro Step: +2m in +0.5s → v=4 m/s
+        info = {"distance": 2.0 * self._steps, "time": 0.5 * self._steps, "is_success": False}
+        return np.zeros(60, dtype=np.float32), 99.0, False, False, info
+
+
+def test_replace_base_decouples_speed_from_distance() -> None:
+    # replace_base: eigener Reward = distance_weight*Δdist - time_penalty*Δzeit.
+    # Erster Step nach reset hat keine Vergangenheit (Δ=0) → 2. Step prüfen.
+    # Δdist=2, Δzeit=0.5. distance_weight=0.01 → 0.02; time_penalty=1.0 → -0.5.
+    # → -0.48. Der originale reward (99.0) wird IGNORIERT (entkoppelt).
+    env = UprightRewardWrapper(
+        _DistEnv(), replace_base=True, distance_weight=0.01, time_penalty=1.0
+    )
+    env.reset()
+    env.step(0)  # erster Step: Δ=0 (Referenz)
+    _obs_out, reward, _t, _tr, _info = env.step(0)
+    assert reward == pytest.approx(0.01 * 2.0 - 1.0 * 0.5)
+
+
+def test_replace_base_off_keeps_original() -> None:
+    # Ohne replace_base bleibt der Original-Reward (99.0) erhalten.
+    env = UprightRewardWrapper(_DistEnv(), replace_base=False)
+    env.reset()
+    _obs_out, reward, _t, _tr, _info = env.step(0)
+    assert reward == pytest.approx(99.0)
+
+
 # --- Integration über make_env ---
 
 _SHAPE_ID = "QwopRlShapeDummy-v0"

@@ -1,0 +1,42 @@
+# W&B-Sweep (Mac): Basis-Reward entkoppeln — Speed statt Distanz.
+#
+# Der Wrapper ersetzt den Basis-Reward (replace_base, aus der base-Config) durch
+# distance_weight*Δdistanz - time_penalty*Δzeit. Der Sweep sucht das Verhaeltnis,
+# bei dem Tempo dominiert, ohne dass der Agent aufgibt (sofort stirbt).
+#   - env.reward_shaping.distance_weight {0.01, 0.05}
+#   - env.reward_shaping.time_penalty {5, 20}
+# 2 x 2 = 4 Runs → grid. Je +2M vom gruenen 7M-Checkpoint. Torso-Sperre bleibt an.
+#
+# Ablauf (Mac, venv aktiv):
+#   caffeinate -d &
+#   wandb sweep --project qwop-rl-dhbw --entity qwop-rl configs/sweep_decouple.yaml
+#   wandb agent qwop-rl/qwop-rl-dhbw/<sweep-id> --count 1    # Dry-Run
+#   wandb agent qwop-rl/qwop-rl-dhbw/<sweep-id>              # voller Sweep (4)
+#
+# Auswertung: rollout/avgspeed (soll STEIGEN — jetzt entkoppelt von distance!) UND
+# success_rate (darf nicht einbrechen). Endlich sollte avgspeed unabhaengig von
+# distance reagieren. time_penalty zu hoch → ep_len_mean kurz, success faellt
+# (Agent stirbt lieber). Dann kleineres time_penalty.
+---
+program: scripts/train.py
+method: grid
+
+metric:
+  name: rollout/avgspeed
+  goal: maximize
+
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - --config
+  - configs/ppo_decouple_base.yaml
+  - --tags
+  - sweep
+  - decouple
+
+parameters:
+  env.reward_shaping.distance_weight:
+    values: [0.01, 0.05]
+  env.reward_shaping.time_penalty:
+    values: [5, 20]

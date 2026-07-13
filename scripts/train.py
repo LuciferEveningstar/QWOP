@@ -105,6 +105,8 @@ _SWEEP_OVERRIDE_KEYS = (
     "env.reward_shaping.height_threshold",
     "env.reward_shaping.speed_weight",
     "env.reward_shaping.gait_weight",
+    "env.reward_shaping.distance_weight",
+    "env.reward_shaping.time_penalty",
 )
 
 
