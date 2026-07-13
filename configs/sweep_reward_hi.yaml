@@ -1,0 +1,45 @@
+# W&B-Sweep (PC): Robben-Malus mit HOEHEREN Schwellen (Erweiterung).
+#
+# Ergaenzt den urspruenglichen Malus-Sweep (threshold 0.35/0.40/0.45) um die
+# hoeheren Schwellen 0.50 und 0.55 — testet, ob der Agent sich noch weiter
+# aufrichtet, wenn die Schwelle strenger liegt.
+#   - env.reward_shaping.height_threshold {0.50, 0.55}
+#   - env.reward_shaping.upright_weight {0.1, 0.2}   (0.05 fiel bisher durch)
+# 2 x 2 = 4 Kombis → method: grid. Jeder Trial 2M Steps (aus base, n_envs=14).
+# ent_coef fest 0.01, penalty_below true (beides aus ppo_reward_sweep_base.yaml).
+#
+# Ablauf (PC, venv aktiv):
+#   # ${interpreter} greift auf diesem Windows-Setup NICHT — vor dem Erstellen die
+#   # command-Zeile unten durch den vollen venv-Python-Pfad ersetzen:
+#   #   D:\VSCodeProjekte\NeueKonzepteQWOP\QWOP\.venv\Scripts\python.exe
+#   wandb sweep --project qwop-rl-dhbw --entity qwop-rl configs\sweep_reward_hi.yaml
+#   wandb agent qwop-rl/qwop-rl-dhbw/<sweep-id> --count 1    # Dry-Run
+#   wandb agent qwop-rl/qwop-rl-dhbw/<sweep-id>              # voller Sweep (4)
+#
+# Auswertung: rollout/torso_height gegen rollout/distance. Hoehere Schwelle koennte
+# zu 'Malus-Falle' fuehren (distance kollabiert) — dann Schwelle zu hoch.
+---
+program: scripts/train.py
+method: grid
+
+metric:
+  name: rollout/torso_height
+  goal: maximize
+
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - --config
+  - configs/ppo_reward_sweep_base.yaml
+  - --tags
+  - sweep
+  - reward
+  - penalty
+  - hi-threshold
+
+parameters:
+  env.reward_shaping.upright_weight:
+    values: [0.1, 0.2]
+  env.reward_shaping.height_threshold:
+    values: [0.50, 0.55]
