@@ -206,6 +206,34 @@ def test_speed_bonus_adds_to_torso_shaping() -> None:
     assert info["reward_shaping"] == pytest.approx(0.75 + 1.5)
 
 
+def test_gait_bonus_rewards_thigh_angle_diff() -> None:
+    # Thigh-Winkel: leftThigh idx 32, rightThigh idx 57. Diff |0.8-(-0.4)|=1.2.
+    # obs[3]=-0.125 → gate = -0.125-(-0.5) = 0.375. gait_weight 0.5.
+    # gait-Bonus = 0.5 * 1.2 * 0.375 = 0.225. Torso: torso 0.30 unter 0.45,
+    # ohne penalty → 0. Nur gait.
+    obs = _obs(0.30, -0.125)
+    obs[32] = 0.8
+    obs[57] = -0.4
+    env = UprightRewardWrapper(
+        _StubEnv(obs, reward=1.0),
+        upright_weight=10.0,
+        height_threshold=0.45,
+        gait_weight=0.5,
+    )
+    _obs_out, _reward, _t, _tr, info = env.step(0)
+    assert info["reward_shaping"] == pytest.approx(0.5 * 1.2 * 0.375)
+
+
+def test_gait_bonus_zero_when_standing() -> None:
+    # Beine gespreizt (diff 1.2), aber Stehen (obs[3]=-0.5 → gate 0) → kein Bonus.
+    obs = _obs(0.30, -0.5)
+    obs[32] = 0.8
+    obs[57] = -0.4
+    env = UprightRewardWrapper(_StubEnv(obs, reward=1.0), gait_weight=0.5, height_threshold=0.45)
+    _obs_out, _reward, _t, _tr, info = env.step(0)
+    assert info["reward_shaping"] == pytest.approx(0.0)
+
+
 # --- Integration über make_env ---
 
 _SHAPE_ID = "QwopRlShapeDummy-v0"

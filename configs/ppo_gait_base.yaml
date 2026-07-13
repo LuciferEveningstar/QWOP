@@ -1,0 +1,48 @@
+# Basis-Config für den Gang-Symmetrie-Sweep, aufbauend auf dem gruenen Trial
+# 180903 (Fall-Penalty-Sweep). Annahme dessen Params: failure_cost 30,
+# upright_weight 0.2 (Torso an), speed_weight 0.1, threshold 0.45.
+#
+# Der Sweep variiert NUR gait_weight (Gang-Symmetrie-Bonus). Torso-Sperre +
+# Hoehen-Sperre bleiben drin. Startet vom 180903-Modell (PC).
+#
+# VORBEDINGUNG: model_load_file unten (REPLACE_ME) auf den echten 180903-Ordner
+# setzen (in W&B den ppo_fall_penalty/<timestamp>/ des gruenen Runs finden).
+algorithm: PPO
+
+env:
+  id: QWOP-v1
+  kwargs:
+    time_cost_mult: 10
+    failure_cost: 30          # Annahme wie gruener Trial 180903
+  reward_shaping:
+    enabled: true
+    upright_weight: 0.2       # Torso an (Annahme wie 180903)
+    height_threshold: 0.45    # Hoehen-Sperre bleibt
+    gate_on_forward: true
+    penalty_below: true
+    speed_weight: 0.1         # fest
+    gait_weight: 0.2          # vom Sweep überschrieben
+
+ppo:
+  policy: MlpPolicy
+  learning_rate: 1.0e-4
+  n_steps: 2048
+  batch_size: 64
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+
+training:
+  total_timesteps: 8_000_000    # 180903 stand bei ~6M → +2M pro Trial
+  model_load_file: "models/ppo_fall_penalty/REPLACE_ME/final.zip"
+  seed: 42
+  n_envs: 14                    # PC 7800X3D
+  checkpoint_freq: 1_000_000
+
+paths:
+  log_dir: logs/ppo_gait
+  model_dir: models/ppo_gait

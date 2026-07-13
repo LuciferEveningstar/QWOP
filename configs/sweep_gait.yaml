@@ -1,0 +1,44 @@
+# W&B-Sweep (PC): Gang-Symmetrie-Bonus gegen den asymmetrischen Fall-Fang-Gang.
+#
+# Der Agent laeuft nur mit einem Bein / faellt nach vorne. Der gait_weight-Bonus
+# belohnt Oberschenkel-Winkeldifferenz (Schrittstellung), gegated mit Tempo —
+# soll abwechselndes, beidbeiniges Laufen erzwingen.
+#   - env.reward_shaping.gait_weight {0.05, 0.2, 0.5, 1.0}
+# 4 Runs → method: grid. Je Trial +2M Steps vom gruenen 180903-Stand.
+# Torso-Sperre (upright 0.2, threshold 0.45) + speed 0.1 + failure 30 bleiben fest.
+#
+# gait_weight-Skala unbekannt (erste Kalibrierung): |Winkeldiff| grob 0-2,
+# gegated (0-1). Bei diff 1, gate 0.5: bonus = weight*0.5 →
+#   0.05=0.025 | 0.2=0.1 | 0.5=0.25 | 1.0=0.5 pro Step.
+#
+# Ablauf (PC, venv aktiv):
+#   # 1. model_load_file (REPLACE_ME) in ppo_gait_base.yaml auf 180903-Ordner setzen.
+#   # 2. ${interpreter} unten durch venv-Pfad ersetzen.
+#   wandb sweep --project qwop-rl-dhbw --entity qwop-rl configs\sweep_gait.yaml
+#   wandb agent qwop-rl/qwop-rl-dhbw/<sweep-id> --count 1    # Dry-Run
+#   wandb agent qwop-rl/qwop-rl-dhbw/<sweep-id>              # voller Sweep (4)
+#
+# Auswertung: rollout/avgspeed + success_rate (sollen hoch/steigend) — UND das
+# Laufbild im Eval anschauen (laeuft er jetzt beidbeinig abwechselnd?). Der
+# Symmetrie-Bonus zielt aufs Laufbild, das sieht man nicht nur in den Metriken.
+---
+program: scripts/train.py
+method: grid
+
+metric:
+  name: rollout/avgspeed
+  goal: maximize
+
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - --config
+  - configs/ppo_gait_base.yaml
+  - --tags
+  - sweep
+  - gait
+
+parameters:
+  env.reward_shaping.gait_weight:
+    values: [0.05, 0.2, 0.5, 1.0]
