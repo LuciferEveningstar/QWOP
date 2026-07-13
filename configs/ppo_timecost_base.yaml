@@ -1,0 +1,47 @@
+# Basis-Config für den Zeitstrafe-Sweep (viel time_cost_mult), aufbauend auf
+# dem gruen-speedonly-Setup: nur Speed-Reward, kein Torso, vom 7M-Checkpoint.
+#
+# Idee: hohe Zeitstrafe macht jeden Step teuer → schnell ankommen (weniger
+# Steps fuer dieselbe Distanz) lohnt sich. Das trennt "schnell" von "weit" — im
+# Gegensatz zum reinen Speed-Bonus (der sich zu Distanz aufsummiert).
+#
+# Der Sweep variiert env.kwargs.time_cost_mult. Rest wie gruen-speedonly.
+algorithm: PPO
+
+env:
+  id: QWOP-v1
+  kwargs:
+    time_cost_mult: 100       # vom Sweep überschrieben
+    failure_cost: 10
+  reward_shaping:
+    enabled: true
+    upright_weight: 0.0       # Torso aus (wie speedonly)
+    height_threshold: 0.45
+    gate_on_forward: true
+    penalty_below: false
+    speed_weight: 0.1         # an (wie speedonly)
+    gait_weight: 0.0
+
+ppo:
+  policy: MlpPolicy
+  learning_rate: 1.0e-4
+  n_steps: 2048
+  batch_size: 64
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+
+training:
+  total_timesteps: 9_000_000    # vom 7M-Checkpoint weiter → +2M pro Trial
+  model_load_file: "models/gruen162806_t050/ckpt_7009984_steps.zip"
+  seed: 42
+  n_envs: 14                    # PC 7800X3D (Mac: auf 2 senken)
+  checkpoint_freq: 1_000_000
+
+paths:
+  log_dir: logs/ppo_timecost
+  model_dir: models/ppo_timecost

@@ -1,0 +1,45 @@
+# W&B-Sweep (PC): hohe Zeitstrafe (time_cost_mult) fuer schnelleres Laufen.
+#
+# Reiner Speed-Bonus summiert sich zu Distanz auf (belohnt "weit", nicht
+# "schnell"). Eine hohe Zeitstrafe dagegen macht jeden Step teuer → schnell
+# ankommen (weniger Steps fuer 100m) lohnt sich → trennt Tempo von Distanz.
+#   - env.kwargs.time_cost_mult {50, 100, 200}
+# 3 Runs → method: grid. Je Trial +2M vom gruen-speedonly-Checkpoint (7M).
+# Rest wie speedonly: nur speed_weight 0.1, kein Torso.
+#
+# Zeitstrafe/Step (dt~0.033): 50→1.7 | 100→3.3 | 200→6.7. Hoch = starker Druck.
+# GRATWANDERUNG: zu hoch → Agent stirbt lieber sofort (kurze Episode = wenig
+# Strafe). Genau das an ep_len_mean/success_rate ablesbar → 200 evtl. zu hart.
+#
+# Ablauf (PC, venv aktiv):
+#   # 1. ${interpreter} unten durch venv-Pfad ersetzen.
+#   # 2. model_load_file (in ppo_timecost_base.yaml) zeigt auf den Mac-Checkpoint;
+#   #    auf dem PC hinkopieren ODER Pfad auf einen PC-Checkpoint anpassen.
+#   wandb sweep --project qwop-rl-dhbw --entity qwop-rl configs\sweep_timecost.yaml
+#   wandb agent qwop-rl/qwop-rl-dhbw/<sweep-id> --count 1    # Dry-Run
+#   wandb agent qwop-rl/qwop-rl-dhbw/<sweep-id>              # voller Sweep (3)
+#
+# Auswertung: rollout/avgspeed (soll STEIGEN) UND success_rate (darf NICHT
+# einbrechen). Ideal beides hoch. success_rate faellt / ep_len_mean sehr kurz →
+# Zeitstrafe zu hart (er stirbt lieber). distance sollte ~100 bleiben.
+---
+program: scripts/train.py
+method: grid
+
+metric:
+  name: rollout/avgspeed
+  goal: maximize
+
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - --config
+  - configs/ppo_timecost_base.yaml
+  - --tags
+  - sweep
+  - timecost
+
+parameters:
+  env.kwargs.time_cost_mult:
+    values: [50, 100, 200]

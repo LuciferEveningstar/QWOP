@@ -100,6 +100,7 @@ _SWEEP_OVERRIDE_KEYS = (
     "ppo.n_steps",
     "ppo.batch_size",
     "env.kwargs.failure_cost",
+    "env.kwargs.time_cost_mult",
     "env.reward_shaping.upright_weight",
     "env.reward_shaping.height_threshold",
     "env.reward_shaping.speed_weight",
