@@ -1,0 +1,52 @@
+# Mega-Run (100M Steps, PC): Fortsetzung des Gait-Trials 192126.
+#
+# Exakt die Params von 192126 (Gait-Sweep, gait_weight 0.05) — 1:1 fortgesetzt,
+# um zu sehen, ob mit viel mehr Training noch was passiert (aufstehen/normal
+# laufen). ent_coef bleibt 0.01 (leicht zappelig → Chance auf Ausbruch aus dem
+# Fall-Fang-Gang). Sonst alles wie gehabt.
+#
+# VORBEDINGUNG: model_load_file unten (STARTMODELL_ZIP_PFAD) auf das echte
+# 192126-final.zip setzen (auf dem PC, z.B. models/ppo_gait/<192126-ordner>/final.zip).
+#
+# Start (PC, venv aktiv, ueber Nacht):
+#   # ${interpreter} ist hier nicht relevant (direkter train.py-Aufruf):
+#   python scripts\train.py --config configs\ppo_mega100m.yaml --run-name mega100m --tags experiment mega
+algorithm: PPO
+
+env:
+  id: QWOP-v1
+  kwargs:
+    time_cost_mult: 10
+    failure_cost: 30          # wie 192126
+  reward_shaping:
+    enabled: true
+    upright_weight: 0.2       # wie 192126
+    height_threshold: 0.45
+    gate_on_forward: true
+    penalty_below: true
+    speed_weight: 0.1
+    gait_weight: 0.05         # wie 192126 (fest, nicht 0.2)
+
+ppo:
+  policy: MlpPolicy
+  learning_rate: 1.0e-4
+  n_steps: 2048
+  batch_size: 64
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.01            # leicht zappelig lassen (Chance auf Ausbruch)
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+
+training:
+  total_timesteps: 100_000_000   # von 192126 (~8M) weiter bis 100M
+  model_load_file: "STARTMODELL_ZIP_PFAD"   # <-- auf dem PC einsetzen (192126-final.zip)
+  seed: 42
+  n_envs: 14                     # PC 7800X3D
+  checkpoint_freq: 200_000
+
+paths:
+  log_dir: logs/ppo_mega100m
+  model_dir: models/ppo_mega100m
