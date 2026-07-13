@@ -1,0 +1,52 @@
+# Weitertraining vom 7M-Checkpoint des gruenen t050-Laufs — NUR Speed-Reward.
+#
+# Alles andere aus: kein Torso-Bonus/-Malus (upright_weight 0, penalty_below
+# false), keine Hoehen-Sperre-Wirkung. Nur der kontinuierliche Speed-Bonus
+# belohnt Vorwaertsgeschwindigkeit. Test, was der Agent macht, wenn ausschliesslich
+# Tempo zaehlt.
+#
+# ACHTUNG: ohne Torso-Anreiz kann er zurueck ins (schnelle) Robben kippen — das
+# ist genau die Frage, die dieser Lauf beantwortet. torso_height im Blick behalten.
+#
+# Start (Mac, venv aktiv):
+#   caffeinate -d &
+#   python scripts/train.py --config configs/ppo_gruen_speedonly.yaml --run-name gruen-speedonly --tags experiment speed
+algorithm: PPO
+
+env:
+  id: QWOP-v1
+  kwargs:
+    time_cost_mult: 10
+    failure_cost: 10
+  reward_shaping:
+    enabled: true
+    upright_weight: 0.0       # Torso-Bonus/-Malus AUS
+    height_threshold: 0.45    # egal (weight 0 → kein Effekt)
+    gate_on_forward: true
+    penalty_below: false      # kein Robben-Malus
+    speed_weight: 0.1         # NUR das zaehlt
+    gait_weight: 0.0          # aus
+
+ppo:
+  policy: MlpPolicy
+  learning_rate: 1.0e-4
+  n_steps: 2048
+  batch_size: 64
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+
+training:
+  total_timesteps: 12_000_000   # vom 7M-Checkpoint weiter
+  model_load_file: "models/gruen162806_t050/ckpt_7009984_steps.zip"
+  seed: 42
+  n_envs: 2                     # MacBook Air 8GB
+  checkpoint_freq: 1_000_000
+
+paths:
+  log_dir: logs/gruen_speedonly
+  model_dir: models/gruen_speedonly
