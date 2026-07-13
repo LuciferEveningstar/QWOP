@@ -39,7 +39,7 @@ training:
   total_timesteps: 9_000_000    # vom 7M-Checkpoint weiter → +2M pro Trial
   model_load_file: "models/gruen162806_t050/ckpt_7009984_steps.zip"
   seed: 42
-  n_envs: 14                    # PC 7800X3D (Mac: auf 2 senken)
+  n_envs: 2                     # MacBook Air 8GB
   checkpoint_freq: 1_000_000
 
 paths:
