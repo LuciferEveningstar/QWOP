@@ -1,0 +1,46 @@
+# Weitertraining Trial 021345 (upright_weight 0.1, threshold 0.45) von 2M -> 8M.
+#
+# Laedt das 2M-final.zip dieses Sweep-Trials (model_load_file) und trainiert +6M
+# weiter (total_timesteps 8M, reset_num_timesteps=False via train.py). Checkpoints
+# alle 500k. reward_shaping-Werte MUESSEN exakt den Trial-Werten entsprechen (der
+# Wrapper sitzt im Env, nicht im geladenen Modell).
+#
+# Start (Mac, venv aktiv, ueber Nacht — caffeinate -d &):
+#   python scripts/train.py --config configs/ppo_continue_w01.yaml --run-name continue-w01 --tags experiment continue
+algorithm: PPO
+
+env:
+  id: QWOP-v1
+  kwargs:
+    time_cost_mult: 10
+    failure_cost: 10
+  reward_shaping:
+    enabled: true
+    upright_weight: 0.1       # exakt wie Trial 021345
+    height_threshold: 0.45    # exakt wie Trial 021345
+    gate_on_forward: true
+    penalty_below: true
+
+ppo:
+  policy: MlpPolicy
+  learning_rate: 1.0e-4
+  n_steps: 2048
+  batch_size: 64
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+
+training:
+  total_timesteps: 8_000_000    # von 2M weiter → +6M
+  model_load_file: "models/ppo_reward_sweep_mac/i-2026-07-13-021345/final.zip"
+  seed: 42
+  n_envs: 2                     # MacBook Air 8GB
+  checkpoint_freq: 500_000
+
+paths:
+  log_dir: logs/ppo_continue_w01
+  model_dir: models/ppo_continue_w01
