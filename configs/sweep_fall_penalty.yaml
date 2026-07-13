@@ -1,0 +1,49 @@
+# W&B-Sweep (PC): Fall-Strafe x Torso an/aus, aufbauend auf dem gruenen
+# Speed-Trial 162806.
+#
+# Testet zwei Hypothesen zugleich:
+#   - env.kwargs.failure_cost {10, 30, 60}     Fallen staerker bestrafen
+#   - env.reward_shaping.upright_weight {0.2, 0.0}  Torso an (0.2) vs aus (0.0)
+# 3 x 2 = 6 Runs → method: grid. Je Trial +2M Steps vom 162806-Stand.
+# speed_weight fest 0.1, threshold 0.45 (aus der base).
+#
+# upright_weight=0.0 = Torso KOMPLETT aus (Bonus UND Malus, da weight*delta=0),
+# nur noch Speed-Bonus + Fall-Strafe wirken.
+#
+# Ablauf (PC, venv aktiv):
+#   # 1. In ppo_fall_penalty_base.yaml den model_load_file-Pfad (REPLACE_ME) auf
+#   #    das echte 162806-Modell setzen (in W&B den ppo_speed_023715/<ts>/ finden).
+#   # 2. ${interpreter} unten durch venv-Pfad ersetzen:
+#   #    D:\VSCodeProjekte\NeueKonzepteQWOP\QWOP\.venv\Scripts\python.exe
+#   wandb sweep --project qwop-rl-dhbw --entity qwop-rl configs\sweep_fall_penalty.yaml
+#   wandb agent qwop-rl/qwop-rl-dhbw/<sweep-id> --count 1    # Dry-Run
+#   wandb agent qwop-rl/qwop-rl-dhbw/<sweep-id>              # voller Sweep (6)
+#
+# Auswertung: rollout/success_rate (soll STEIGEN — Ziel des Ganzen) + avgspeed.
+# WICHTIG beim Torso-AUS-Zweig (upright_weight 0.0): rollout/torso_height pruefen!
+# Faellt sie stark = er robbt wieder (flach+schnell) → failure_cost allein haelt
+# ihn NICHT aufrecht (Robben faellt ja nicht). Nur wenn torso_height hoch bleibt
+# ist Torso-aus ok.
+---
+program: scripts/train.py
+method: grid
+
+metric:
+  name: rollout/success_rate
+  goal: maximize
+
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - --config
+  - configs/ppo_fall_penalty_base.yaml
+  - --tags
+  - sweep
+  - fall-penalty
+
+parameters:
+  env.kwargs.failure_cost:
+    values: [10, 30, 60]
+  env.reward_shaping.upright_weight:
+    values: [0.2, 0.0]

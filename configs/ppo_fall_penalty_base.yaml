@@ -1,0 +1,46 @@
+# Basis-Config für den Fall-Strafe-Sweep, aufbauend auf dem gruenen Speed-Trial
+# 162806 (speed_weight 0.1, Torso upright_weight 0.2 / threshold 0.45).
+#
+# Der Sweep variiert: Torso an/aus (via upright_weight 0.2/0.0) und failure_cost.
+# Startet vom 162806-Modell (PC, aus dem Speed-Sweep) via model_load_file.
+# Jeder Trial +2M Steps (von seinem Stand weiter).
+algorithm: PPO
+
+env:
+  id: QWOP-v1
+  kwargs:
+    time_cost_mult: 10
+    failure_cost: 30          # vom Sweep überschrieben
+  reward_shaping:
+    enabled: true
+    upright_weight: 0.2       # vom Sweep überschrieben (0.2=Torso an, 0.0=aus)
+    height_threshold: 0.45    # fest
+    gate_on_forward: true
+    penalty_below: true
+    speed_weight: 0.1         # fest — wie Trial 162806
+
+ppo:
+  policy: MlpPolicy
+  learning_rate: 1.0e-4
+  n_steps: 2048
+  batch_size: 64
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+
+training:
+  total_timesteps: 6_000_000    # 162806 stand bei ~4M → +2M pro Trial
+  # WICHTIG: Pfad zum 162806-final.zip auf dem PC. In W&B nachschauen, welcher
+  # ppo_speed_023715/<timestamp>/ das ist, und hier eintragen:
+  model_load_file: "models/ppo_speed_023715/REPLACE_ME/final.zip"
+  seed: 42
+  n_envs: 14                    # PC 7800X3D
+  checkpoint_freq: 1_000_000
+
+paths:
+  log_dir: logs/ppo_fall_penalty
+  model_dir: models/ppo_fall_penalty
