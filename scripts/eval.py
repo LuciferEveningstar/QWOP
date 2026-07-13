@@ -60,14 +60,14 @@ def main() -> int:
     # call env.render() ourselves — doing it every Nth step lets us trade
     # smoothness against speed.
     env = make_env(
-        {
-            "id": "QWOP-v1",
-            "kwargs": {
-                "game_in_browser": True,
-                "stat_in_browser": True,
-            },
-        }
-    )
+    {
+        "id": "QWOP-v1",
+        "kwargs": {
+            "browser": "C:/Program Files/Google/Chrome/Application/chrome.exe",
+            "driver": "C:/tools/chromedriver/chromedriver-win64/chromedriver.exe",
+        },
+    }
+)
     model = PPO.load(args.model, env=env)
 
     for ep in range(1, args.episodes + 1):

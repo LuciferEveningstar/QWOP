@@ -1,5 +1,3 @@
-# Test-Run zur Sichtbarmachung von Lernfortschritt — 500k Steps, ~25-35 min auf M-Series.
-# Ziel: erste echte Lernkurve in W&B sehen, Modell danach abspielen.
 algorithm: PPO
 
 env:
@@ -12,14 +10,14 @@ env:
 
 ppo:
   policy: MlpPolicy
-  learning_rate: 3.0e-4
+  learning_rate: 5.0e-5  # Gedämpfte Lernrate für das Fine-Tuning
   n_steps: 2048
-  batch_size: 64
+  batch_size: 256        # Erhöhter Batch für glattere Updates
   n_epochs: 10
   gamma: 0.99
   gae_lambda: 0.95
-  clip_range: 0.2
-  ent_coef: 0.0
+  clip_range: 0.1        # Engere PPO Trust-Region
+  ent_coef: 0.001        # Minimale Exploration, damit er nicht bei 43m starr wird
   vf_coef: 0.5
   max_grad_norm: 0.5
 
@@ -29,5 +27,5 @@ training:
   n_envs: 1
 
 paths:
-  log_dir: logs/ppo_test500k
-  model_dir: models/ppo_test500k
+  log_dir: logs/ppo_finetune
+  model_dir: models/ppo_finetune

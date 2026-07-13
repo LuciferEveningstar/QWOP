@@ -1,0 +1,217 @@
+_current_progress_remaining:
+    value: -1.3962515300613987e-05
+_custom_logger:
+    value: "False"
+_episode_num:
+    value: 0
+_last_episode_starts:
+    value: '[ True]'
+_last_obs:
+    value: |-
+        [[-0.9763941  -0.1822861  -0.20857537 -0.49996138 -0.3929341  -0.9737969
+          -0.55740976  0.01065133 -0.50024533 -0.39300483 -0.9727966  -0.27588224
+           0.15068974 -0.4999548  -0.39292154 -0.9752337   0.5574016  -0.26503894
+          -0.5000005  -0.39293176 -0.973723    0.81371915  0.01999613 -0.5000094
+          -0.3929351  -0.9701323  -0.2825435  -0.20081039 -0.49998742 -0.39292005
+          -0.9762921   0.16964328 -0.33630762 -0.49998322 -0.3929354  -0.9789026
+          -0.34523857 -0.08706052 -0.49995136 -0.39294425 -0.9812695   0.53954977
+          -0.12649792 -0.5000051  -0.3929422  -0.9832551   0.76150656  0.09834155
+          -0.50000983 -0.39294878 -0.98036224 -0.10121071 -0.29252356 -0.49998456
+          -0.3929461  -0.97809124  0.2109303   0.2474848  -0.49998745 -0.39294046]]
+_last_original_obs:
+    value: None
+_logger:
+    value: <stable_baselines3.common.logger.Logger object at 0x0000017374D1B110>
+_n_updates:
+    value: 134290
+_num_timesteps_at_start:
+    value: 27502592
+_stats_window_size:
+    value: 100
+_total_timesteps:
+    value: 40002592
+_vec_normalize_env:
+    value: None
+_wandb:
+    value:
+        cli_version: 0.27.2
+        code_path: code/scripts/train.py
+        e:
+            en1qgtzu1cmcjrzr53c8hjzp332zttzx:
+                args:
+                    - --config
+                    - configs\ppo_default.yaml
+                    - --run-name
+                    - test-27.5m-to-40m-niko
+                codePath: scripts\train.py
+                codePathLocal: scripts\train.py
+                cpu_count: 6
+                cpu_count_logical: 12
+                disk:
+                    /:
+                        total: "252839981056"
+                        used: "225416757248"
+                email: s232669@student.dhbw-mannheim.de
+                executable: C:\dev\QWOP\.venv\Scripts\python.exe
+                git:
+                    commit: d7bfc6a4f9309eb34d69a4601da8e05b2a31b68a
+                    remote: https://github.com/LuciferEveningstar/QWOP.git
+                host: WTDELVSE268378L
+                memory:
+                    total: "15919931392"
+                os: Windows-10-10.0.26100-SP0
+                program: C:\dev\QWOP\scripts\train.py
+                python: CPython 3.11.9
+                root: C:\dev\QWOP
+                startedAt: "2026-06-11T21:11:54.593044Z"
+                writerId: en1qgtzu1cmcjrzr53c8hjzp332zttzx
+        m: []
+        python_version: 3.11.9
+        t:
+            "1":
+                - 1
+            "2":
+                - 1
+            "3":
+                - 2
+                - 3
+                - 13
+                - 16
+                - 22
+                - 35
+                - 41
+            "4": 3.11.9
+            "5": 0.27.2
+            "8":
+                - 3
+            "10":
+                - 19
+            "12": 0.27.2
+            "13": windows-amd64
+action_noise:
+    value: None
+action_space:
+    value: Discrete(16)
+algo:
+    value: PPO
+algorithm:
+    value: PPO
+batch_size:
+    value: 64
+clip_range:
+    value: FloatSchedule(ConstantSchedule(val=0.2))
+clip_range_vf:
+    value: None
+device:
+    value: cpu
+ent_coef:
+    value: 0
+env:
+    value:
+        id: QWOP-v1
+ep_info_buffer:
+    value: 'deque([{''r'': 13.955472, ''l'': 384, ''t'': 24116.924744}, {''r'': 129.888806, ''l'': 1297, ''t'': 24119.350652}, {''r'': 31.871272, ''l'': 416, ''t'': 24121.347076}, {''r'': 8.16844, ''l'': 371, ''t'': 24122.032359}, {''r'': 79.768505, ''l'': 822, ''t'': 24123.563291}, {''r'': 50.110509, ''l'': 565, ''t'': 24124.623991}, {''r'': -2.493977, ''l'': 207, ''t'': 24126.223305}, {''r'': -10.161498, ''l'': 64, ''t'': 24126.348475}, {''r'': 28.895783, ''l'': 413, ''t'': 24127.138014}, {''r'': 39.697452, ''l'': 501, ''t'': 24128.071705}, {''r'': 149.294538, ''l'': 1514, ''t'': 24132.150136}, {''r'': -10.138731, ''l'': 67, ''t'': 24132.279978}, {''r'': 136.331876, ''l'': 1276, ''t'': 24134.686313}, {''r'': 281.262125, ''l'': 2102, ''t'': 24139.811483}, {''r'': 112.883434, ''l'': 1522, ''t'': 24143.859163}, {''r'': 143.232302, ''l'': 4359, ''t'': 24154.39824}, {''r'': 79.872753, ''l'': 843, ''t'': 24157.325294}, {''r'': 124.919328, ''l'': 1325, ''t'': 24159.803134}, {''r'': 106.452623, ''l'': 2437, ''t'': 24167.044347}, {''r'': 131.307312, ''l'': 1218, ''t'': 24169.32269}, {''r'': 64.845561, ''l'': 689, ''t'': 24170.605653}, {''r'': 95.726587, ''l'': 2367, ''t'': 24177.649973}, {''r'': 132.377292, ''l'': 1589, ''t'': 24180.599544}, {''r'': 220.120773, ''l'': 2063, ''t'': 24185.608167}, {''r'': 135.632551, ''l'': 1286, ''t'': 24189.249299}, {''r'': 136.459009, ''l'': 6419, ''t'': 24204.876446}, {''r'': -11.609189, ''l'': 86, ''t'': 24205.044007}, {''r'': 71.375078, ''l'': 821, ''t'': 24207.801458}, {''r'': 266.206312, ''l'': 2511, ''t'': 24213.698872}, {''r'': 71.866648, ''l'': 4941, ''t'': 24225.310844}, {''r'': 277.67176, ''l'': 2143, ''t'': 24230.728004}, {''r'': 50.761464, ''l'': 6480, ''t'': 24246.456647}, {''r'': 280.897033, ''l'': 2108, ''t'': 24252.847935}, {''r'': 51.85139, ''l'': 604, ''t'': 24254.000418}, {''r'': 16.837374, ''l'': 389, ''t'': 24254.739694}, {''r'': 283.061144, ''l'': 2079, ''t'': 24259.819643}, {''r'': 284.629668, ''l'': 2066, ''t'': 24264.847736}, {''r'': 49.344828, ''l'': 511, ''t'': 24265.81602}, {''r'': 277.924247, ''l'': 2153, ''t'': 24271.034531}, {''r'': 283.058909, ''l'': 2067, ''t'': 24276.061868}, {''r'': 131.62394, ''l'': 1506, ''t'': 24280.041975}, {''r'': 133.391581, ''l'': 1559, ''t'': 24284.162087}, {''r'': 14.749125, ''l'': 299, ''t'': 24284.738337}, {''r'': 86.228019, ''l'': 821, ''t'': 24286.290486}, {''r'': 217.539217, ''l'': 2119, ''t'': 24291.632988}, {''r'': 35.111387, ''l'': 486, ''t'': 24293.724169}, {''r'': 280.871443, ''l'': 2125, ''t'': 24298.939483}, {''r'': 6.454577, ''l'': 214, ''t'': 24299.344367}, {''r'': 118.410429, ''l'': 1057, ''t'': 24301.311864}, {''r'': 11.048429, ''l'': 241, ''t'': 24301.759247}, {''r'': 88.153051, ''l'': 896, ''t'': 24304.637901}, {''r'': 94.811575, ''l'': 1035, ''t'': 24306.647434}, {''r'': 114.941716, ''l'': 1061, ''t'': 24309.945204}, {''r'': 35.765831, ''l'': 486, ''t'': 24310.855922}, {''r'': 11.791473, ''l'': 271, ''t'': 24311.382187}, {''r'': -1.617028, ''l'': 164, ''t'': 24311.69068}, {''r'': 47.340628, ''l'': 557, ''t'': 24313.977168}, {''r'': 281.510854, ''l'': 2148, ''t'': 24319.779704}, {''r'': 134.702489, ''l'': 1262, ''t'': 24322.274452}, {''r'': 38.822683, ''l'': 621, ''t'': 24324.660811}, {''r'': 92.002153, ''l'': 946, ''t'': 24326.623651}, {''r'': 2.848293, ''l'': 217, ''t'': 24327.056614}, {''r'': 175.502812, ''l'': 1567, ''t'': 24331.23448}, {''r'': 281.436233, ''l'': 2223, ''t'': 24336.623919}, {''r'': -8.572986, ''l'': 163, ''t'': 24336.935417}, {''r'': 110.634164, ''l'': 1079, ''t'': 24340.177132}, {''r'': 146.927188, ''l'': 1410, ''t'': 24342.790043}, {''r'': 4.239567, ''l'': 305, ''t'': 24343.339445}, {''r'': 19.037532, ''l'': 395, ''t'': 24345.277432}, {''r'': 60.993352, ''l'': 756, ''t'': 24346.680614}, {''r'': 145.070657, ''l'': 1532, ''t'': 24350.942002}, {''r'': -28.253328, ''l'': 748, ''t'': 24352.32334}, {''r'': 56.092719, ''l'': 739, ''t'': 24353.698496}, {''r'': -4.778614, ''l'': 283, ''t'': 24355.468273}, {''r'': 93.724883, ''l'': 1022, ''t'': 24357.379559}, {''r'': -7.17991, ''l'': 160, ''t'': 24357.679897}, {''r'': 85.607803, ''l'': 844, ''t'': 24360.459749}, {''r'': 252.37132, ''l'': 2960, ''t'': 24367.143034}, {''r'': 275.84854, ''l'': 2226, ''t'': 24372.577223}, {''r'': 280.027685, ''l'': 2164, ''t'': 24377.901664}, {''r'': -11.044142, ''l'': 103, ''t'': 24378.08681}, {''r'': 95.391956, ''l'': 1014, ''t'': 24381.176149}, {''r'': -2.385309, ''l'': 317, ''t'': 24381.772024}, {''r'': -5.768501, ''l'': 188, ''t'': 24382.115555}, {''r'': 65.00575, ''l'': 782, ''t'': 24383.581491}, {''r'': -9.718706, ''l'': 127, ''t'': 24383.807658}, {''r'': -9.607968, ''l'': 230, ''t'': 24385.43323}, {''r'': -11.063606, ''l'': 171, ''t'': 24385.74893}, {''r'': -7.693779, ''l'': 143, ''t'': 24386.02534}, {''r'': 165.255781, ''l'': 3701, ''t'': 24394.177335}, {''r'': 230.680307, ''l'': 3747, ''t'': 24403.692652}, {''r'': 106.900084, ''l'': 1062, ''t'': 24406.958256}, {''r'': -4.230221, ''l'': 135, ''t'': 24407.213258}, {''r'': 86.670192, ''l'': 860, ''t'': 24408.803009}, {''r'': 140.434827, ''l'': 1283, ''t'': 24412.571407}, {''r'': 133.668448, ''l'': 1498, ''t'': 24416.561224}, {''r'': 280.002477, ''l'': 2229, ''t'': 24421.918344}, {''r'': 90.114711, ''l'': 863, ''t'': 24423.54585}, {''r'': -3.646744, ''l'': 173, ''t'': 24423.868792}, {''r'': -6.797136, ''l'': 97, ''t'': 24424.050565}], maxlen=100)'
+ep_success_buffer:
+    value: deque([False, False, False, False, False, False, False, False, False, False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, True, False, False, True, False, True, False, True, False, False, True, True, False, True, True, False, False, False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, True, False, False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, True, True, True, False, False, False, False, False, False, False, False, False, False, True, False, False, False, False, False, True, False, False, False], maxlen=100)
+gae_lambda:
+    value: 0.95
+gamma:
+    value: 0.99
+learning_rate:
+    value: 0.0003
+lr_schedule:
+    value: FloatSchedule(ConstantSchedule(val=0.0003))
+max_grad_norm:
+    value: 0.5
+n_envs:
+    value: 1
+n_epochs:
+    value: 10
+n_steps:
+    value: 2048
+normalize_advantage:
+    value: "True"
+num_timesteps:
+    value: 27502592
+observation_space:
+    value: Box(-1.0, 1.0, (60,), float32)
+paths:
+    value:
+        log_dir: logs/ppo_default
+        model_dir: models/ppo_default
+policy:
+    value: |-
+        ActorCriticPolicy(
+          (features_extractor): FlattenExtractor(
+            (flatten): Flatten(start_dim=1, end_dim=-1)
+          )
+          (pi_features_extractor): FlattenExtractor(
+            (flatten): Flatten(start_dim=1, end_dim=-1)
+          )
+          (vf_features_extractor): FlattenExtractor(
+            (flatten): Flatten(start_dim=1, end_dim=-1)
+          )
+          (mlp_extractor): MlpExtractor(
+            (policy_net): Sequential(
+              (0): Linear(in_features=60, out_features=64, bias=True)
+              (1): Tanh()
+              (2): Linear(in_features=64, out_features=64, bias=True)
+              (3): Tanh()
+            )
+            (value_net): Sequential(
+              (0): Linear(in_features=60, out_features=64, bias=True)
+              (1): Tanh()
+              (2): Linear(in_features=64, out_features=64, bias=True)
+              (3): Tanh()
+            )
+          )
+          (action_net): Linear(in_features=64, out_features=16, bias=True)
+          (value_net): Linear(in_features=64, out_features=1, bias=True)
+        )
+policy_class:
+    value: <class 'stable_baselines3.common.policies.ActorCriticPolicy'>
+policy_kwargs:
+    value: '{}'
+ppo:
+    value:
+        batch_size: 64
+        clip_range: 0.2
+        ent_coef: 0
+        gae_lambda: 0.95
+        gamma: 0.99
+        learning_rate: 0.0003
+        max_grad_norm: 0.5
+        n_epochs: 10
+        n_steps: 2048
+        policy: MlpPolicy
+        vf_coef: 0.5
+rollout_buffer:
+    value: <stable_baselines3.common.buffers.RolloutBuffer object at 0x0000017374CBE090>
+rollout_buffer_class:
+    value: <class 'stable_baselines3.common.buffers.RolloutBuffer'>
+rollout_buffer_kwargs:
+    value: '{}'
+sde_sample_freq:
+    value: -1
+seed:
+    value: 42
+start_time:
+    value: 1781212332557379600
+target_kl:
+    value: None
+tensorboard_log:
+    value: logs\ppo_default
+training:
+    value:
+        checkpoint_freq: 50000
+        eval_freq: 10000
+        model_load_file: models/ppo_default/final_27.5m.zip
+        n_envs: 1
+        seed: 42
+        total_timesteps: 12500000
+use_sde:
+    value: "False"
+verbose:
+    value: 1
+vf_coef:
+    value: 0.5

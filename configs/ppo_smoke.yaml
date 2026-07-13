@@ -4,7 +4,9 @@ algorithm: PPO
 
 env:
   id: QWOP-v1
-  kwargs: {}
+  kwargs:
+    browser: "C:/Program Files/Google/Chrome/Application/chrome.exe"
+    driver: "C:/tools/chromedriver/chromedriver-win64/chromedriver.exe"
 
 ppo:
   policy: MlpPolicy

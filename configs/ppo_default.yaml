@@ -2,8 +2,9 @@
 algorithm: PPO
 
 env:
-  id: QwopEnv-v0          # noch nicht registriert
-  kwargs: {}
+  id: QWOP-v1
+  kwargs:
+    browser: "C:/Program Files/Google/Chrome/Application/chrome.exe"
 
 ppo:
   policy: MlpPolicy       # ggf. CnnPolicy bei Pixel-Obs
@@ -21,7 +22,7 @@ ppo:
 training:
   total_timesteps: 1_000_000
   seed: 42
-  n_envs: 4
+  n_envs: 1
   eval_freq: 10_000
   checkpoint_freq: 50_000
 
