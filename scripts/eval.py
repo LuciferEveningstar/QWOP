@@ -180,10 +180,14 @@ def main() -> int:
     print()
     if best_seed is not None:
         print(f"[eval] Schnellster ZIEL-Lauf: seed={best_seed} ({best_stats})")
+        # Repro-Befehl MUSS dieselbe deterministic-Einstellung spiegeln wie dieser
+        # Lauf — sonst weicht die Trajektorie ab. Bei Sampling (Default) macht der
+        # Policy-RNG (set_random_seed) den Lauf reproduzierbar.
+        det_flag = " --deterministic" if args.deterministic else ""
         print(
             f"[eval] Exakt nachspielen (langsam): python scripts/eval.py "
-            f"--model {args.model} --episodes 1 --seed {best_seed - 1} "
-            f"--deterministic --fps 30 --render-every 1"
+            f"--model {args.model} --episodes 1 --seed {best_seed - 1}"
+            f"{det_flag} --fps 30 --render-every 1"
         )
     else:
         print("[eval] Kein erfolgreicher (ZIEL-)Lauf in dieser Session.")
