@@ -1,0 +1,52 @@
+# Weitertraining des gruenen Speed-Trials 162806 auf 10M (Mac-Testlauf).
+#
+# Exakt die Params von Trial 162806 (Speed-Sweep-Gewinner): speed_weight 0.1,
+# Torso upright_weight 0.2 / threshold 0.45, penalty_below, failure_cost 10.
+# Laedt das 162806-Modell und trainiert von ~4M auf 10M weiter — Testlauf, um
+# zu sehen, ob er mit mehr Zeit bei GLEICHEN Params weiter Fortschritt macht.
+#
+# VORBEDINGUNG: das 162806-final.zip vom PC hierher kopieren:
+#   models/gruen162806/final.zip
+# (auf dem PC liegt es unter models/ppo_speed_023715/<162806-timestamp>/final.zip)
+#
+# Start (Mac, venv aktiv, ueber Nacht — dauert lang bei n_envs=2):
+#   caffeinate -d &
+#   python scripts/train.py --config configs/ppo_gruen162806_continue.yaml --run-name gruen162806-continue --tags experiment continue gruen
+algorithm: PPO
+
+env:
+  id: QWOP-v1
+  kwargs:
+    time_cost_mult: 10
+    failure_cost: 10          # wie 162806
+  reward_shaping:
+    enabled: true
+    upright_weight: 0.2       # wie 162806
+    height_threshold: 0.45    # wie 162806
+    gate_on_forward: true
+    penalty_below: true
+    speed_weight: 0.1         # wie 162806
+
+ppo:
+  policy: MlpPolicy
+  learning_rate: 1.0e-4
+  n_steps: 2048
+  batch_size: 64
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+
+training:
+  total_timesteps: 10_000_000   # von ~4M weiter bis 10M gesamt
+  model_load_file: "models/gruen162806/final.zip"
+  seed: 42
+  n_envs: 2                     # MacBook Air 8GB
+  checkpoint_freq: 1_000_000
+
+paths:
+  log_dir: logs/gruen162806_continue
+  model_dir: models/gruen162806_continue
