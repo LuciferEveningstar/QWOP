@@ -1,0 +1,55 @@
+# Basis-Config: terminaler avgspeed-Reward + DICHTER Distanz-Term (Sweep).
+#
+# Der reine terminal_speed-Lauf (termspeed) ist kollabiert: das Signal war zu
+# spaerlich (nur 1x/Episode) → der Agent verlernte das Laufen (distance/ep_len/
+# avgspeed alle abgestuerzt). Fix: dichter Distanz-Term (distance_weight*Δdistanz
+# pro Step) dazu → kontinuierlicher Lauf-Anreiz, waehrend avgspeed am Ende aufs
+# Tempo schaerft. Der Sweep variiert distance_weight.
+#
+# Startet vom 77M-Checkpoint (guter Laeufer, vor dem Kollaps).
+# VORBEDINGUNG: model_load_file (STARTMODELL_ZIP_PFAD) auf den 77M-Checkpoint setzen.
+algorithm: PPO
+
+env:
+  id: QWOP-v1
+  kwargs:
+    time_cost_mult: 10
+    failure_cost: 10
+  reward_shaping:
+    enabled: true
+    terminal_speed: true      # avgspeed am Episodenende
+    speed_scale: 154.0        # avgspeed ~13 → ~2000
+    success_reward: 77.0
+    failure_cost: 77.0
+    distance_weight: 5.0      # vom Sweep überschrieben — dichter Distanz-Term/Step
+    # Rest aus (nur Speed + Distanz):
+    upright_weight: 0.0
+    penalty_below: false
+    speed_weight: 0.0
+    gait_weight: 0.0
+    gate_on_forward: true
+    height_threshold: 0.45
+
+ppo:
+  policy: MlpPolicy
+  learning_rate: 1.0e-4
+  n_steps: 2048
+  batch_size: 64
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+
+training:
+  total_timesteps: 85_000_000    # vom 77M-Checkpoint weiter → +2M pro Trial
+  model_load_file: "STARTMODELL_ZIP_PFAD"   # <-- 77M-Checkpoint auf dem PC einsetzen
+  seed: 42
+  n_envs: 14                     # PC 7800X3D
+  checkpoint_freq: 200_000
+
+paths:
+  log_dir: logs/ppo_speeddist
+  model_dir: models/ppo_speeddist

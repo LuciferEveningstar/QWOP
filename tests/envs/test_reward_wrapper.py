@@ -335,6 +335,46 @@ def test_terminal_speed_fall() -> None:
     assert reward == pytest.approx(154.0 * 13.0 - 77.0)
 
 
+class _TermDistEnv(gym.Env):
+    """Stub: steigende distance + avgspeed, terminiert nach n Steps."""
+
+    metadata: ClassVar[dict[str, Any]] = {"render_modes": []}
+
+    def __init__(self, n: int = 2) -> None:
+        super().__init__()
+        self.observation_space = gym.spaces.Box(-1.0, 1.0, shape=(60,), dtype=np.float32)
+        self.action_space = gym.spaces.Discrete(1)
+        self._n, self._s = n, 0
+
+    def reset(self, *, seed=None, options=None):  # type: ignore[no-untyped-def]
+        super().reset(seed=seed)
+        self._s = 0
+        return np.zeros(60, dtype=np.float32), {"distance": 0.0, "time": 0.0}
+
+    def step(self, action):  # type: ignore[no-untyped-def]
+        self._s += 1
+        done = self._s >= self._n
+        info = {
+            "distance": 3.0 * self._s,
+            "time": 1.0 * self._s,
+            "avgspeed": 3.0,
+            "is_success": False,
+        }
+        return np.zeros(60, dtype=np.float32), 99.0, done, False, info
+
+
+def test_terminal_speed_plus_dense_distance() -> None:
+    # Mid-Episode (nicht Ende): terminal-Anteil 0, aber dichter Distanz-Term greift.
+    # Δdistanz=3 pro Step, distance_weight=10 → 30. terminal=0 (nicht Ende) → 30.
+    env = UprightRewardWrapper(
+        _TermDistEnv(n=3), terminal_speed=True, speed_scale=154.0, distance_weight=10.0
+    )
+    env.reset()
+    env.step(0)  # Step 1 (Referenz-distance)
+    _o, reward, _t, _tr, _i = env.step(0)  # Step 2: Δdist=3, nicht Ende
+    assert reward == pytest.approx(10.0 * 3.0)
+
+
 # --- Integration über make_env ---
 
 _SHAPE_ID = "QwopRlShapeDummy-v0"

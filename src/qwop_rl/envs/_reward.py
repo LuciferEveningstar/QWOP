@@ -226,6 +226,20 @@ class UprightRewardWrapper(gym.Wrapper):
                 r -= self.failure_cost
         return r
 
+    def _dense_distance(self, info: dict[str, Any]) -> float:
+        """Dichter Distanz-Anteil pro Step: distance_weight * Δdistanz.
+
+        Gibt bei jedem Step ein Signal (im Gegensatz zum spaerlichen terminalen
+        avgspeed-Reward) → der Agent behaelt einen kontinuierlichen Anreiz, die
+        Strecke zu machen. Braucht distance aus info.
+        """
+        dist = info.get("distance")
+        if dist is None:
+            return 0.0
+        d_dist = 0.0 if self._last_distance is None else float(dist) - self._last_distance
+        self._last_distance = float(dist)
+        return self.distance_weight * d_dist
+
     def reset(self, **kwargs: Any) -> tuple[Any, dict[str, Any]]:
         self._last_distance = None
         self._last_time = None
@@ -234,8 +248,10 @@ class UprightRewardWrapper(gym.Wrapper):
     def step(self, action: Any) -> tuple[Any, float, bool, bool, dict[str, Any]]:
         obs, reward, terminated, truncated, info = self.env.step(action)
         if self.terminal_speed:
-            # Basis-Reward komplett verwerfen, nur terminaler avgspeed zaehlt.
+            # Terminaler avgspeed (spaerlich) PLUS dichter Distanz-Term pro Step,
+            # damit der Agent einen kontinuierlichen Lauf-Anreiz behaelt.
             reward = self._terminal_speed_reward(terminated, truncated, info)
+            reward += self._dense_distance(info)
         elif self.replace_base:
             reward = self._base_reward(float(reward), terminated, info)
         shaping, torso_height = self._shaping_term(obs)

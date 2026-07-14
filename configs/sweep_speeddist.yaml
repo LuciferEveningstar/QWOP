@@ -1,0 +1,39 @@
+# W&B-Sweep (PC): avgspeed-Terminal + dichter Distanz-Term.
+#
+# Fix fuer den kollabierten termspeed-Lauf (rein terminal war zu spaerlich →
+# Agent verlernte laufen). Dichter Distanz-Term (distance_weight*Δdistanz/Step)
+# gibt kontinuierlichen Lauf-Anreiz zurueck. Sweep sucht das richtige Gewicht:
+#   - env.reward_shaping.distance_weight {1, 3, 5, 10}
+# 4 Runs → grid. Je +2M vom 77M-Checkpoint. avgspeed-Term fest (speed_scale 154).
+#
+# Ablauf (PC, venv aktiv):
+#   # 1. model_load_file (STARTMODELL_ZIP_PFAD) in ppo_speeddist_base.yaml setzen.
+#   # 2. ${interpreter} unten durch venv-Pfad ersetzen.
+#   wandb sweep --project qwop-rl-dhbw --entity qwop-rl configs\sweep_speeddist.yaml
+#   wandb agent qwop-rl/qwop-rl-dhbw/<sweep-id> --count 1    # Dry-Run
+#   wandb agent qwop-rl/qwop-rl-dhbw/<sweep-id>              # voller Sweep (4)
+#
+# Auswertung: rollout/distance + ep_len_mean muessen sich HALTEN (kein Kollaps wie
+# bei termspeed!), avgspeed hoch. Zu kleiner distance_weight → evtl. wieder Kollaps;
+# zu grosser → nur Distanz zaehlt, Tempo egal (zurueck zum alten Problem).
+---
+program: scripts/train.py
+method: grid
+
+metric:
+  name: rollout/avgspeed
+  goal: maximize
+
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - --config
+  - configs/ppo_speeddist_base.yaml
+  - --tags
+  - sweep
+  - speeddist
+
+parameters:
+  env.reward_shaping.distance_weight:
+    values: [1, 3, 5, 10]
