@@ -95,6 +95,8 @@ class UprightRewardWrapper(gym.Wrapper):
         time_penalty: float = 0.0,
         success_reward: float = 50.0,
         failure_cost: float = 10.0,
+        terminal_speed: bool = False,
+        speed_scale: float = 1.0,
     ) -> None:
         super().__init__(env)
         self.upright_weight = float(upright_weight)
@@ -109,6 +111,9 @@ class UprightRewardWrapper(gym.Wrapper):
         self.time_penalty = float(time_penalty)
         self.success_reward = float(success_reward)
         self.failure_cost = float(failure_cost)
+        # Terminaler avgspeed-Reward (nur am Episodenende):
+        self.terminal_speed = bool(terminal_speed)
+        self.speed_scale = float(speed_scale)
         self._last_distance: float | None = None
         self._last_time: float | None = None
 
@@ -195,6 +200,32 @@ class UprightRewardWrapper(gym.Wrapper):
                 new_reward -= self.failure_cost
         return new_reward
 
+    def _terminal_speed_reward(
+        self, terminated: bool, truncated: bool, info: dict[str, Any]
+    ) -> float:
+        """Reward NUR am Episodenende: skalierter avgspeed + Boni.
+
+        Entkoppelt Speed von Distanz, weil avgspeed = distance/time (Tempo, nicht
+        Strecke). Pro Step 0, am Ende:
+            speed_scale * avgspeed  (- failure_cost falls gefallen)
+                                    (+ success_reward falls 100m).
+        speed_scale so gewaehlt, dass typischer avgspeed den bisherigen Reward-
+        Bereich trifft (kein Crash beim Umstellen). success/failure sind halbe
+        speed-Einheiten (= speed_scale/2).
+        """
+        if not (terminated or truncated):
+            return 0.0
+        avgspeed = info.get("avgspeed")
+        if avgspeed is None:
+            return 0.0
+        r = self.speed_scale * float(avgspeed)
+        if terminated:
+            if bool(info.get("is_success")):
+                r += self.success_reward
+            else:
+                r -= self.failure_cost
+        return r
+
     def reset(self, **kwargs: Any) -> tuple[Any, dict[str, Any]]:
         self._last_distance = None
         self._last_time = None
@@ -202,7 +233,10 @@ class UprightRewardWrapper(gym.Wrapper):
 
     def step(self, action: Any) -> tuple[Any, float, bool, bool, dict[str, Any]]:
         obs, reward, terminated, truncated, info = self.env.step(action)
-        if self.replace_base:
+        if self.terminal_speed:
+            # Basis-Reward komplett verwerfen, nur terminaler avgspeed zaehlt.
+            reward = self._terminal_speed_reward(terminated, truncated, info)
+        elif self.replace_base:
             reward = self._base_reward(float(reward), terminated, info)
         shaping, torso_height = self._shaping_term(obs)
         # Für Logging/Kalibrierung sichtbar machen (W&B / eval.py).

@@ -99,6 +99,10 @@ def make_env(config: dict[str, Any] | None = None) -> gym.Env:
             replace_base=bool(shaping_cfg.get("replace_base", False)),
             distance_weight=float(shaping_cfg.get("distance_weight", 1.0)),
             time_penalty=float(shaping_cfg.get("time_penalty", 0.0)),
+            success_reward=float(shaping_cfg.get("success_reward", 50.0)),
+            failure_cost=float(shaping_cfg.get("failure_cost", 10.0)),
+            terminal_speed=bool(shaping_cfg.get("terminal_speed", False)),
+            speed_scale=float(shaping_cfg.get("speed_scale", 1.0)),
         )
 
     # Faire Vergleichsmetriken pro Episode nach W&B/TensorBoard durchreichen

@@ -279,6 +279,62 @@ def test_replace_base_off_keeps_original() -> None:
     assert reward == pytest.approx(99.0)
 
 
+class _TermEnv(gym.Env):
+    """Stub: liefert avgspeed + is_success, terminiert nach n Steps."""
+
+    metadata: ClassVar[dict[str, Any]] = {"render_modes": []}
+
+    def __init__(self, avgspeed: float, success: bool, n: int = 2) -> None:
+        super().__init__()
+        self.observation_space = gym.spaces.Box(-1.0, 1.0, shape=(60,), dtype=np.float32)
+        self.action_space = gym.spaces.Discrete(1)
+        self._avgspeed, self._success, self._n, self._s = avgspeed, success, n, 0
+
+    def reset(self, *, seed=None, options=None):  # type: ignore[no-untyped-def]
+        super().reset(seed=seed)
+        self._s = 0
+        return np.zeros(60, dtype=np.float32), {}
+
+    def step(self, action):  # type: ignore[no-untyped-def]
+        self._s += 1
+        done = self._s >= self._n
+        info = {
+            "avgspeed": self._avgspeed,
+            "is_success": self._success,
+            "distance": 0.0,
+            "time": 1.0,
+        }
+        return np.zeros(60, dtype=np.float32), 99.0, done, False, info
+
+
+def test_terminal_speed_zero_mid_episode() -> None:
+    # Mitten in der Episode: Reward 0 (nur am Ende zaehlt was).
+    env = UprightRewardWrapper(_TermEnv(13.0, False, n=3), terminal_speed=True, speed_scale=154.0)
+    env.reset()
+    _o, reward, _t, _tr, _i = env.step(0)  # Step 1 von 3 → nicht Ende
+    assert reward == pytest.approx(0.0)
+
+
+def test_terminal_speed_success() -> None:
+    # Ende + Ziel: speed_scale*avgspeed + success_reward = 154*13 + 77 = 2079.
+    env = UprightRewardWrapper(
+        _TermEnv(13.0, True, n=1), terminal_speed=True, speed_scale=154.0, success_reward=77.0
+    )
+    env.reset()
+    _o, reward, _t, _tr, _i = env.step(0)
+    assert reward == pytest.approx(154.0 * 13.0 + 77.0)
+
+
+def test_terminal_speed_fall() -> None:
+    # Ende + Sturz: speed_scale*avgspeed - failure_cost = 154*13 - 77 = 1925.
+    env = UprightRewardWrapper(
+        _TermEnv(13.0, False, n=1), terminal_speed=True, speed_scale=154.0, failure_cost=77.0
+    )
+    env.reset()
+    _o, reward, _t, _tr, _i = env.step(0)
+    assert reward == pytest.approx(154.0 * 13.0 - 77.0)
+
+
 # --- Integration über make_env ---
 
 _SHAPE_ID = "QwopRlShapeDummy-v0"

@@ -1,0 +1,61 @@
+# Weitertraining vom 77M-Checkpoint (mega100m) — REIN terminaler Speed-Reward.
+#
+# Nur Speed zaehlt, alles andere aus: kein Torso, kein Gait, kein Distanz-Term.
+# Reward NUR am Episodenende (terminal_speed):
+#     speed_scale * avgspeed  (+ success_reward falls 100m) (- failure_cost falls Sturz)
+# speed_scale=154 → avgspeed ~13 ergibt ~2000 (wie der bisherige Reward-Bereich,
+# kein Crash beim Umstellen). success_reward + failure_cost je 77 (= halbe
+# Speed-Einheit, 1 Einheit = +1 m/s = 154).
+#
+# ACHTUNG: reines Terminal-Signal ist spaerlich (nur 1x/Episode) → PPO lernt
+# langsamer. Vom guten 77M-Stand aber machbar. Torso-Sperre ist AUS → er koennte
+# zurueck ins flache Robben kippen; das ist bewusst so gewaehlt (nur Speed).
+#
+# VORBEDINGUNG: model_load_file (STARTMODELL_ZIP_PFAD) auf den 77M-Checkpoint
+# setzen (auf dem PC, z.B. models/ppo_mega100m/ckpt_77000000_steps.zip).
+#
+# Start (PC):  python scripts\train.py --config configs\ppo_termspeed.yaml --run-name termspeed --tags experiment speed
+algorithm: PPO
+
+env:
+  id: QWOP-v1
+  kwargs:
+    time_cost_mult: 10        # egal (Basis-Reward wird durch terminal_speed ersetzt)
+    failure_cost: 10
+  reward_shaping:
+    enabled: true
+    terminal_speed: true      # NUR am Episodenende: skalierter avgspeed + Boni
+    speed_scale: 154.0        # avgspeed ~13 → ~2000 (bisheriger Bereich)
+    success_reward: 77.0      # halbe Speed-Einheit
+    failure_cost: 77.0        # halbe Speed-Einheit (Sturz-Malus)
+    # alles andere aus:
+    upright_weight: 0.0
+    penalty_below: false
+    speed_weight: 0.0
+    gait_weight: 0.0
+    gate_on_forward: true
+    height_threshold: 0.45
+
+ppo:
+  policy: MlpPolicy
+  learning_rate: 1.0e-4
+  n_steps: 2048
+  batch_size: 64
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.01            # leicht zappelig (Chance auf Verbesserung)
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+
+training:
+  total_timesteps: 150_000_000   # vom 77M-Checkpoint weiter (viel Luft)
+  model_load_file: "STARTMODELL_ZIP_PFAD"   # <-- 77M-Checkpoint auf dem PC einsetzen
+  seed: 42
+  n_envs: 14                     # PC 7800X3D
+  checkpoint_freq: 200_000
+
+paths:
+  log_dir: logs/ppo_termspeed
+  model_dir: models/ppo_termspeed
