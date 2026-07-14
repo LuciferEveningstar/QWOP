@@ -1,8 +1,8 @@
 """Evaluate a trained QWOP agent — load a saved model, play visibly in the browser.
 
 Usage:
-    python scripts/eval.py --model models/pl-2026-06-11-test500k/final.zip
-    python scripts/eval.py --model models/pl-2026-06-11-test500k/final.zip --episodes 5
+    python scripts/eval.py --model models/ppo_default/best_peak_36.7m.zip
+    python scripts/eval.py --model models/ppo_default/best_peak_36.7m.zip --episodes 5 --fps 30
 
 The browser window must stay in the foreground while playing — same constraint
 as training (see CLAUDE.md, Stolperstein 12).
@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
 from pathlib import Path
 
 
@@ -37,11 +38,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--render-every",
         type=int,
-        default=4,
-        help=(
-            "Render every Nth step (default: 4 → ~15 Hz). Lower = smoother but"
-            " slower; higher = faster but choppier. Set to 0 to disable rendering."
-        ),
+        default=1,
+        help="Render every Nth step (default: 1 = every step, smoothest).",
+    )
+    parser.add_argument(
+        "--fps",
+        type=float,
+        default=30.0,
+        help="Playback speed in frames/sec. 30 = real QWOP speed. 0 = as fast as possible.",
     )
     return parser.parse_args()
 
@@ -56,9 +60,6 @@ def main() -> int:
 
     from qwop_rl.envs import make_env
 
-    # Show the game in the browser. auto_draw=False (default) means we have to
-    # call env.render() ourselves — doing it every Nth step lets us trade
-    # smoothness against speed.
     env = make_env(
         {
             "id": "QWOP-v1",
@@ -69,6 +70,8 @@ def main() -> int:
         }
     )
     model = PPO.load(args.model, env=env)
+
+    frame_delay = 1.0 / args.fps if args.fps and args.fps > 0 else 0.0
 
     for ep in range(1, args.episodes + 1):
         obs, _info = env.reset()
@@ -82,6 +85,8 @@ def main() -> int:
             steps += 1
             if args.render_every and steps % args.render_every == 0:
                 env.render()
+                if frame_delay:
+                    time.sleep(frame_delay)
         print(f"[eval] Episode {ep}: reward={total_reward:.2f}, steps={steps}")
 
     env.close()
