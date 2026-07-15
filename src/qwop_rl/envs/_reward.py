@@ -97,6 +97,7 @@ class UprightRewardWrapper(gym.Wrapper):
         failure_cost: float = 10.0,
         terminal_speed: bool = False,
         speed_scale: float = 1.0,
+        speed_distance_coupled: bool = False,
     ) -> None:
         super().__init__(env)
         self.upright_weight = float(upright_weight)
@@ -114,6 +115,7 @@ class UprightRewardWrapper(gym.Wrapper):
         # Terminaler avgspeed-Reward (nur am Episodenende):
         self.terminal_speed = bool(terminal_speed)
         self.speed_scale = float(speed_scale)
+        self.speed_distance_coupled = bool(speed_distance_coupled)
         self._last_distance: float | None = None
         self._last_time: float | None = None
 
@@ -219,6 +221,13 @@ class UprightRewardWrapper(gym.Wrapper):
         if avgspeed is None:
             return 0.0
         r = self.speed_scale * float(avgspeed)
+        # Optional mit Distanz-Anteil koppeln: avgspeed * (distance/100). So zaehlt
+        # BEIDES (Tempo x zurueckgelegte Strecke) — schneller Kurz-Sprint bringt
+        # fast nichts (kleiner Distanz-Anteil), schnelles 100m maximal.
+        if self.speed_distance_coupled:
+            dist = info.get("distance")
+            if dist is not None:
+                r *= float(dist) / 100.0
         if terminated:
             if bool(info.get("is_success")):
                 r += self.success_reward

@@ -103,6 +103,7 @@ def make_env(config: dict[str, Any] | None = None) -> gym.Env:
             failure_cost=float(shaping_cfg.get("failure_cost", 10.0)),
             terminal_speed=bool(shaping_cfg.get("terminal_speed", False)),
             speed_scale=float(shaping_cfg.get("speed_scale", 1.0)),
+            speed_distance_coupled=bool(shaping_cfg.get("speed_distance_coupled", False)),
         )
 
     # Faire Vergleichsmetriken pro Episode nach W&B/TensorBoard durchreichen

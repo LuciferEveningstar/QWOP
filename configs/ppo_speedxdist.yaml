@@ -1,0 +1,58 @@
+# Speed×Distanz gekoppelt — der Reward, der Tempo WIRKLICH belohnt (nicht nur Distanz).
+#
+# Problem aller bisherigen Versuche: speed_weight belohnt Speed pro Step, was sich
+# mathematisch zu Distanz aufsummiert → Speed war nie unabhaengig relevant.
+# Fix: terminaler Reward = speed_scale * avgspeed * (distance/100). avgspeed = Tempo
+# (nicht Strecke), * Distanz-Anteil = beides gekoppelt. Schneller Kurz-Sprint bringt
+# fast nichts, schnelles 100m maximal. PLUS kleiner dichter Distanz-Term als
+# Lauf-Anker gegen das Sparsity-Kollaps-Risiko.
+#
+# Kalibriert: speed_scale 336 → avgspeed 14 @ 100m ~= 4700 (bisheriger Bereich, kein Crash).
+#
+# VORBEDINGUNG: model_load_file auf den Mega-Checkpoint setzen (STARTMODELL_ZIP_PFAD).
+algorithm: PPO
+
+env:
+  id: QWOP-v1
+  kwargs:
+    time_cost_mult: 10
+    failure_cost: 10
+  reward_shaping:
+    enabled: true
+    terminal_speed: true
+    speed_distance_coupled: true   # avgspeed * (distance/100) — DER Fix
+    speed_scale: 336.0             # avgspeed 14 @ 100m ~= 4700
+    success_reward: 168.0          # halbe speed-einheit-ish (336/2), Ankunfts-Anreiz
+    failure_cost: 168.0
+    distance_weight: 5.0           # kleiner dichter Lauf-Anker pro Step
+    # Rest aus:
+    upright_weight: 0.0
+    penalty_below: false
+    speed_weight: 0.0
+    gait_weight: 0.0
+    gate_on_forward: true
+    height_threshold: 0.45
+
+ppo:
+  policy: MlpPolicy
+  learning_rate: 1.0e-4
+  n_steps: 2048
+  batch_size: 64
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+
+training:
+  total_timesteps: 30_000_000    # zusaetzliche Steps ab Checkpoint (additiv)
+  model_load_file: "STARTMODELL_ZIP_PFAD"   # <-- Mega-Checkpoint einsetzen
+  seed: 42
+  n_envs: 2                      # MacBook Air 8GB (PC: 14)
+  checkpoint_freq: 200_000
+
+paths:
+  log_dir: logs/ppo_speedxdist
+  model_dir: models/ppo_speedxdist

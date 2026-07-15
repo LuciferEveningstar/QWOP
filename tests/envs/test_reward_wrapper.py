@@ -375,6 +375,22 @@ def test_terminal_speed_plus_dense_distance() -> None:
     assert reward == pytest.approx(10.0 * 3.0)
 
 
+def test_terminal_speed_distance_coupled() -> None:
+    # coupled: speed_scale * avgspeed * (distance/100). n=1 → Ende sofort,
+    # distance=3, avgspeed=3. 100 * 3 * (3/100) = 9. (distance_weight 0 → kein dichter Term)
+    env = UprightRewardWrapper(
+        _TermDistEnv(n=1),
+        terminal_speed=True,
+        speed_distance_coupled=True,
+        speed_scale=100.0,
+        distance_weight=0.0,
+        failure_cost=0.0,
+    )
+    env.reset()
+    _o, reward, _t, _tr, _i = env.step(0)
+    assert reward == pytest.approx(100.0 * 3.0 * (3.0 / 100.0))
+
+
 # --- Integration über make_env ---
 
 _SHAPE_ID = "QwopRlShapeDummy-v0"
